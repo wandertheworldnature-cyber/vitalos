@@ -37,23 +37,105 @@ export async function getTrendData(userId: string, testName: string): Promise<{ 
   return (data || []).map(r => ({ date: r.recorded_at.split('T')[0], value: r.value }))
 }
 
-// ─── Reports — server-side OCR via Edge Function ─────────────────
+// ─── OCR — tries Edge Function first, falls back to direct Gemini ─
+const OCR_PROMPT = `You are an expert at reading Indian lab reports (Thyrocare, SRL, Apollo, AIIMS, Wellwise, Sterling Accuris, Smart Pathology, Metropolis, Tata 1mg, Vijaya Diagnostics).
+Extract ALL test results. Return ONLY valid JSON — no markdown, no backticks, no explanation:
+{"lab_name":"string","report_date":"YYYY-MM-DD","records":[{"test_name":"string","value":number,"unit":"string","reference_min":number_or_null,"reference_max":number_or_null}]}
+Extract every test including: Hemoglobin WBC RBC Platelets MCV MCH MCHC RDW PCV Neutrophils Lymphocytes Eosinophils Monocytes Basophils Fasting Glucose HbA1c Post-Prandial Glucose Total Cholesterol LDL HDL VLDL Triglycerides TSH T3 T4 Free T3 Free T4 Creatinine Urea BUN eGFR Uric Acid ALT AST ALP GGT Bilirubin Total Protein Albumin Vitamin D Vitamin B12 Ferritin Iron TIBC Sodium Potassium Calcium Phosphorus CRP ESR.
+Return ONLY the JSON object with actual numeric values.`
+
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve((reader.result as string).split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+function parseOCRResult(text: string) {
+  try {
+    const cleaned = text.replace(/```json|```/g, '').trim()
+    const match = cleaned.match(/\{[\s\S]*\}/)
+    if (!match) return null
+    const parsed = JSON.parse(match[0])
+    if (!Array.isArray(parsed.records)) parsed.records = []
+    parsed.records = parsed.records.filter((r: { test_name?: unknown; value?: unknown }) =>
+      r.test_name && typeof r.value === 'number' && !isNaN(r.value as number)
+    )
+    return parsed
+  } catch { return null }
+}
+
+async function callGeminiDirect(base64: string, mimeType: string, apiKey: string): Promise<string | null> {
+  // For PDFs, try gemini-1.5-pro which has better PDF support
+  const models = mimeType === 'application/pdf'
+    ? ['gemini-1.5-flash', 'gemini-1.5-pro']
+    : ['gemini-1.5-flash']
+
+  for (const model of models) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { inline_data: { mime_type: mimeType, data: base64 } },
+              { text: OCR_PROMPT }
+            ]}],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+          })
+        }
+      )
+      if (res.status === 429) { console.warn(`${model} rate limited`); continue }
+      if (!res.ok) { console.warn(`${model} error:`, res.status); continue }
+      const data = await res.json() as { candidates?: Array<{ content: { parts: Array<{ text: string }> } }> }
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+      if (text) { console.log(`✓ ${model} OCR succeeded`); return text }
+    } catch (e) { console.warn(`${model} exception:`, e) }
+  }
+  return null
+}
+
+async function callGroqVisionDirect(base64: string, mimeType: string, apiKey: string): Promise<string | null> {
+  if (mimeType === 'application/pdf') return null // Groq Vision doesn't support PDFs
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        messages: [{ role: 'user', content: [
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+          { type: 'text', text: OCR_PROMPT }
+        ]}],
+        max_tokens: 4096, temperature: 0.1
+      })
+    })
+    if (!res.ok) { console.warn('Groq Vision error:', res.status); return null }
+    const data = await res.json() as { choices: Array<{ message: { content: string } }> }
+    return data.choices?.[0]?.message?.content || null
+  } catch (e) { console.warn('Groq Vision error:', e); return null }
+}
+
 export async function uploadAndScanReport(
   userId: string, file: File, familyMemberId?: string,
   onProgress?: (msg: string) => void
 ): Promise<{ report: HealthReport; recordsAdded: number }> {
 
-  // 1. Upload to Supabase Storage
+  // 1. Upload file to Supabase Storage
   onProgress?.('Uploading to storage...')
-  const ext = file.name.split('.').pop()
-  const path = `${userId}/${Date.now()}_${file.name.replace(/[^a-z0-9.]/gi, '_')}`
+  const safeName = file.name.replace(/[^a-z0-9._-]/gi, '_')
+  const path = `${userId}/${Date.now()}_${safeName}`
 
   const { error: uploadError } = await supabase.storage.from('health-reports').upload(path, file)
-  if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`)
+  if (uploadError) throw new Error(`Storage failed: ${uploadError.message}. Run SQL migration 002 if bucket missing.`)
 
   const { data: { publicUrl } } = supabase.storage.from('health-reports').getPublicUrl(path)
 
-  // 2. Create report record in DB
+  // 2. Create report DB record
   const { data: reportData, error: reportError } = await supabase
     .from('health_reports').insert({
       user_id: userId,
@@ -61,14 +143,16 @@ export async function uploadAndScanReport(
       file_name: file.name,
       file_url: publicUrl,
       file_type: file.type,
-      ocr_status: 'pending',
+      ocr_status: 'processing',
     }).select().single()
-
   if (reportError) throw new Error(`DB insert failed: ${reportError.message}`)
   const report = reportData as HealthReport
 
-  // 3. Call OCR Edge Function (server-side — no CSP issues, handles PDFs)
-  onProgress?.('AI reading your report (server-side)...')
+  // 3. Try Edge Function first (server-side, best for PDFs)
+  onProgress?.('Sending to AI for analysis...')
+  let recordsAdded = 0
+  let edgeFnWorked = false
+
   try {
     const formData = new FormData()
     formData.append('file', file)
@@ -79,17 +163,97 @@ export async function uploadAndScanReport(
       body: formData,
     })
 
-    if (fnError) throw new Error(fnError.message)
-
-    const recordsAdded = fnData?.recordsAdded || 0
-    onProgress?.(`Saved ${recordsAdded} test values`)
-
-    return { report: { ...report, ocr_status: 'done' }, recordsAdded }
-  } catch (err) {
-    // Update report as failed
-    await supabase.from('health_reports').update({ ocr_status: 'failed' }).eq('id', report.id)
-    throw err
+    if (!fnError && fnData?.success) {
+      recordsAdded = fnData.recordsAdded || 0
+      edgeFnWorked = true
+      onProgress?.(`Saved ${recordsAdded} test values`)
+    }
+  } catch {
+    console.log('Edge function not available — using direct API fallback')
   }
+
+  // 4. Fallback: direct browser API calls (works without deploying Edge Function)
+  if (!edgeFnWorked) {
+    onProgress?.('AI reading your report directly...')
+
+    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY
+    const groqKey   = import.meta.env.VITE_GROQ_API_KEY
+
+    const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    const base64 = await fileToBase64(file)
+    const mimeType = isPDF ? 'application/pdf' : (file.type || 'image/jpeg')
+
+    let ocrText: string | null = null
+
+    if (isPDF) {
+      // PDFs: Gemini only (Groq Vision doesn't support PDFs)
+      onProgress?.('Gemini AI reading PDF...')
+      if (geminiKey && !geminiKey.includes('your-gemini-key')) {
+        ocrText = await callGeminiDirect(base64, mimeType, geminiKey)
+      }
+
+      if (!ocrText) {
+        // Last resort: update DB as failed and give clear instructions
+        await supabase.from('health_reports').update({ ocr_status: 'failed' }).eq('id', report.id)
+        throw new Error(
+          'PDF OCR requires the Edge Function to be deployed.\n\n' +
+          'QUICK FIX: Convert your PDF to a JPG image (screenshot or pdf2jpg.net) and upload that instead.\n\n' +
+          'OR deploy the Edge Function:\n' +
+          'supabase functions deploy ocr-report\n' +
+          'supabase secrets set GEMINI_API_KEY=your-key GROQ_API_KEY=your-key'
+        )
+      }
+    } else {
+      // Images: Try Groq Vision first (faster), then Gemini
+      onProgress?.('Groq AI reading your report...')
+      if (groqKey && !groqKey.includes('your-groq-key')) {
+        ocrText = await callGroqVisionDirect(base64, mimeType, groqKey)
+      }
+      if (!ocrText && geminiKey && !geminiKey.includes('your-gemini-key')) {
+        onProgress?.('Trying Gemini fallback...')
+        ocrText = await callGeminiDirect(base64, mimeType, geminiKey)
+      }
+      if (!ocrText) {
+        await supabase.from('health_reports').update({ ocr_status: 'failed' }).eq('id', report.id)
+        throw new Error('OCR failed. Check VITE_GROQ_API_KEY and VITE_GEMINI_API_KEY in Vercel environment variables.')
+      }
+    }
+
+    const extracted = parseOCRResult(ocrText)
+    if (!extracted || extracted.records.length === 0) {
+      await supabase.from('health_reports').update({ ocr_status: 'done', extracted_data: { records: [] } }).eq('id', report.id)
+      return { report: { ...report, ocr_status: 'done' }, recordsAdded: 0 }
+    }
+
+    // Save records to DB
+    const records = extracted.records.map((r: { test_name: string; value: number; unit: string; reference_min?: number | null; reference_max?: number | null }) => ({
+      user_id: userId,
+      family_member_id: familyMemberId || null,
+      record_type: 'blood_test' as const,
+      test_name: r.test_name,
+      value: r.value,
+      unit: r.unit,
+      reference_min: r.reference_min ?? null,
+      reference_max: r.reference_max ?? null,
+      source: extracted.lab_name || 'Lab report',
+      recorded_at: extracted.report_date ? new Date(extracted.report_date).toISOString() : new Date().toISOString(),
+      metadata: { report_id: report.id },
+    }))
+
+    const { error: recErr } = await supabase.from('health_records').insert(records)
+    if (!recErr) recordsAdded = records.length
+
+    await supabase.from('health_reports').update({
+      ocr_status: 'done',
+      extracted_data: extracted,
+      lab_name: extracted.lab_name || null,
+      report_date: extracted.report_date || null,
+    }).eq('id', report.id)
+
+    onProgress?.(`Saved ${recordsAdded} test values`)
+  }
+
+  return { report: { ...report, ocr_status: 'done' }, recordsAdded }
 }
 
 export async function getReports(userId: string): Promise<HealthReport[]> {
