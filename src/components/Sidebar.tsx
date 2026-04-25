@@ -1,9 +1,12 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Activity, Brain, TrendingUp,
-  Stethoscope, Users, FlaskConical, CreditCard, LogOut, Heart, Settings
+  Stethoscope, Users, FlaskConical, CreditCard,
+  LogOut, Heart, Settings, UserCog
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
 const navItems = [
@@ -17,9 +20,30 @@ const navItems = [
   { to: '/subscription', icon: CreditCard,      label: 'Subscription' },
 ]
 
+const DAILY_TIPS = [
+  'Drink 8 glasses of water today to support kidney health.',
+  'Walk 8,000 steps daily to reduce diabetes risk by 22%.',
+  '15 min sunlight daily boosts Vitamin D naturally.',
+  'Sleep 7–9 hours for optimal heart and metabolic health.',
+  'Eat a handful of nuts daily to improve HDL cholesterol.',
+  'Deep breathing for 5 minutes lowers cortisol levels.',
+]
+
 export default function Sidebar() {
   const { user, signOut } = useAuthStore()
   const navigate = useNavigate()
+  const [isDoctor, setIsDoctor] = useState(false)
+  const [tip] = useState(DAILY_TIPS[new Date().getDay() % DAILY_TIPS.length])
+
+  useEffect(() => {
+    if (user?.email) checkIfDoctor()
+  }, [user?.email])
+
+  async function checkIfDoctor() {
+    const { data } = await supabase
+      .from('doctors').select('id').eq('doctor_email', user?.email).single()
+    setIsDoctor(!!data)
+  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -28,8 +52,8 @@ export default function Sidebar() {
   }
 
   const initials = user?.full_name
-    ? user.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-    : user?.email?.slice(0, 2).toUpperCase() || 'U'
+    ? user.full_name.split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()
+    : user?.email?.slice(0,2).toUpperCase() || 'U'
 
   const planColors: Record<string, string> = {
     basic:   'bg-gray-100 text-gray-600',
@@ -39,17 +63,17 @@ export default function Sidebar() {
 
   return (
     <aside className="w-56 flex flex-col shrink-0 h-screen sticky top-0"
-      style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f0fdf8 100%)', borderRight: '1px solid #d1fae5' }}>
+      style={{ background: 'linear-gradient(180deg,#ffffff 0%,#f0fdf8 100%)', borderRight: '1px solid #d1fae5' }}>
 
       {/* Logo */}
       <div className="px-4 py-5 border-b border-emerald-100">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md"
-            style={{ background: 'linear-gradient(135deg, #0f6e56, #1d9e75)' }}>
+            style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)' }}>
             <Heart size={16} className="text-white" fill="white" />
           </div>
           <div>
-            <div className="text-sm font-bold text-gray-900 tracking-wide">VitalOS</div>
+            <div className="text-sm font-bold text-gray-900">VitalOS</div>
             <div className="text-[10px] text-emerald-600 font-medium">Health operating system</div>
           </div>
         </div>
@@ -66,39 +90,43 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Health tip widget */}
-      <div className="mx-3 mb-3 p-3 rounded-xl border border-emerald-100"
-        style={{ background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)' }}>
-        <p className="text-[10px] font-semibold text-emerald-800 mb-1">💡 Daily tip</p>
-        <p className="text-[10px] text-emerald-700 leading-relaxed">
-          Drink 8 glasses of water today to support kidney health and metabolism.
-        </p>
+      {/* Daily tip */}
+      <div className="mx-3 mb-2 p-3 rounded-xl border border-emerald-100"
+        style={{ background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)' }}>
+        <p className="text-[10px] font-bold text-emerald-800 mb-1">💡 Daily tip</p>
+        <p className="text-[10px] text-emerald-700 leading-relaxed">{tip}</p>
       </div>
 
       {/* User */}
       <div className="p-3 border-t border-emerald-100">
         <div className="flex items-center gap-2.5 mb-2.5">
           <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm shrink-0"
-            style={{ background: 'linear-gradient(135deg, #0f6e56, #1d9e75)' }}>
+            style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)' }}>
             {initials}
           </div>
           <div className="min-w-0">
             <div className="text-xs font-semibold text-gray-900 truncate">
               {user?.full_name || user?.email?.split('@')[0] || 'User'}
             </div>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold capitalize ${planColors[user?.plan || 'basic']}`}>
-              {user?.plan || 'basic'} plan
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold capitalize ${planColors[user?.plan||'basic']}`}>
+              {user?.plan||'basic'} plan
             </span>
           </div>
         </div>
-        <div className="flex gap-1.5">
-          <button onClick={handleSignOut}
-            className="flex-1 flex items-center justify-center gap-1.5 text-[11px] text-gray-400 hover:text-red-500 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
-            <LogOut size={11} /> Sign out
-          </button>
+        <div className="flex gap-1.5 flex-wrap">
+          {isDoctor && (
+            <button onClick={() => navigate('/doctor')}
+              className="flex items-center gap-1 text-[11px] text-teal-700 bg-teal-50 hover:bg-teal-100 py-1 px-2 rounded-lg transition-colors font-semibold">
+              <UserCog size={11} /> Doctor panel
+            </button>
+          )}
           <button onClick={() => navigate('/admin')}
-            className="flex items-center justify-center gap-1 text-[11px] text-gray-400 hover:text-gray-700 py-1.5 px-2 rounded-lg hover:bg-gray-100 transition-colors">
-            <Settings size={11} />
+            className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-700 py-1 px-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <Settings size={11} /> Admin
+          </button>
+          <button onClick={handleSignOut}
+            className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-red-500 py-1 px-2 rounded-lg hover:bg-red-50 transition-colors ml-auto">
+            <LogOut size={11} /> Out
           </button>
         </div>
       </div>

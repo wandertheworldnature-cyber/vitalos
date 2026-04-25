@@ -17,6 +17,7 @@ import HealthDataPage from '@/pages/HealthDataPage'
 import ReportsPage from '@/pages/ReportsPage'
 import SubscriptionPage from '@/pages/SubscriptionPage'
 import ConsultationRoom from '@/pages/ConsultationRoom'
+
 import AdminLayout from '@/pages/admin/AdminLayout'
 import AdminOverview from '@/pages/admin/AdminOverview'
 import AdminUsers from '@/pages/admin/AdminUsers'
@@ -25,6 +26,12 @@ import AdminAppointments from '@/pages/admin/AdminAppointments'
 import AdminProducts from '@/pages/admin/AdminProducts'
 import AdminAnnouncements from '@/pages/admin/AdminAnnouncements'
 import AdminAnalytics from '@/pages/admin/AdminAnalytics'
+
+import DoctorLayout from '@/pages/doctor/DoctorLayout'
+import DoctorOverview from '@/pages/doctor/DoctorOverview'
+import DoctorAppointments from '@/pages/doctor/DoctorAppointments'
+import DoctorPatients from '@/pages/doctor/DoctorPatients'
+import DoctorConsultations from '@/pages/doctor/DoctorConsultations'
 
 export default function App() {
   const { setUser, fetchProfile } = useAuthStore()
@@ -53,16 +60,17 @@ export default function App() {
   return (
     <BrowserRouter>
       <Toaster position="top-right" toastOptions={{
-        style: { fontSize: '13px', borderRadius: '10px', border: '0.5px solid #e5e7eb', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
+        style: { fontSize:'13px', borderRadius:'10px', border:'0.5px solid #e5e7eb', boxShadow:'0 4px 12px rgba(0,0,0,0.08)' }
       }} />
       <Routes>
         <Route path="/login"  element={<AuthPage />} />
         <Route path="/signup" element={<AuthPage />} />
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
 
-        {/* Consultation room — full screen, outside AppLayout */}
+        {/* Full-screen consultation room */}
         <Route path="/consultation/:roomId" element={<ProtectedRoute><ConsultationRoom /></ProtectedRoute>} />
 
+        {/* Main user app */}
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
           <Route path="/dashboard"    element={<Dashboard />} />
           <Route path="/health-data"  element={<HealthDataPage />} />
@@ -74,6 +82,7 @@ export default function App() {
           <Route path="/subscription" element={<SubscriptionPage />} />
         </Route>
 
+        {/* Admin panel */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index                    element={<AdminOverview />} />
           <Route path="users"             element={<AdminUsers />} />
@@ -82,6 +91,14 @@ export default function App() {
           <Route path="products"          element={<AdminProducts />} />
           <Route path="announcements"     element={<AdminAnnouncements />} />
           <Route path="analytics"         element={<AdminAnalytics />} />
+        </Route>
+
+        {/* Doctor panel */}
+        <Route path="/doctor" element={<DoctorLayout />}>
+          <Route index                       element={<DoctorOverview />} />
+          <Route path="appointments"         element={<DoctorAppointments />} />
+          <Route path="patients"             element={<DoctorPatients />} />
+          <Route path="consultations"        element={<DoctorConsultations />} />
         </Route>
 
         <Route path="/"   element={<Navigate to="/dashboard" replace />} />
