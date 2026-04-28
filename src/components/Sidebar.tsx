@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Activity, Brain, TrendingUp,
   Stethoscope, Users, FlaskConical, CreditCard,
-  LogOut, Heart, Settings, UserCog
+  LogOut, Heart, Settings, UserCog, Zap
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect, useState } from 'react'
@@ -10,14 +10,15 @@ import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
 const navItems = [
-  { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard'   },
-  { to: '/health-data',  icon: Activity,        label: 'Health data'  },
-  { to: '/insights',     icon: Brain,           label: 'AI insights'  },
-  { to: '/trends',       icon: TrendingUp,      label: 'Trends'       },
-  { to: '/doctors',      icon: Stethoscope,     label: 'Doctors'      },
-  { to: '/family',       icon: Users,           label: 'Family'       },
-  { to: '/reports',      icon: FlaskConical,    label: 'Reports'      },
-  { to: '/subscription', icon: CreditCard,      label: 'Subscription' },
+  { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard'        },
+  { to: '/longevity',    icon: Zap,             label: 'Longevity Score', highlight: true },
+  { to: '/health-data',  icon: Activity,        label: 'Health data'      },
+  { to: '/insights',     icon: Brain,           label: 'AI insights'      },
+  { to: '/trends',       icon: TrendingUp,      label: 'Trends'           },
+  { to: '/doctors',      icon: Stethoscope,     label: 'Doctors'          },
+  { to: '/family',       icon: Users,           label: 'Family'           },
+  { to: '/reports',      icon: FlaskConical,    label: 'Reports'          },
+  { to: '/subscription', icon: CreditCard,      label: 'Subscription'     },
 ]
 
 const DAILY_TIPS = [
@@ -27,6 +28,7 @@ const DAILY_TIPS = [
   'Sleep 7–9 hours for optimal heart and metabolic health.',
   'Eat a handful of nuts daily to improve HDL cholesterol.',
   'Deep breathing for 5 minutes lowers cortisol levels.',
+  'Avoid sugar-sweetened beverages — they raise HbA1c fastest.',
 ]
 
 export default function Sidebar() {
@@ -80,12 +82,17 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-4 overflow-y-auto space-y-0.5">
-        {navItems.map(({ to, icon: Icon, label }) => (
+      <nav className="flex-1 py-3 overflow-y-auto space-y-0.5">
+        {navItems.map(({ to, icon: Icon, label, highlight }) => (
           <NavLink key={to} to={to}
-            className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}>
-            <Icon size={16} />
+            className={({ isActive }) =>
+              `sidebar-item ${isActive ? 'active' : ''} ${highlight && !isActive ? 'text-amber-600 font-semibold' : ''}`
+            }>
+            <Icon size={16} className={highlight ? 'text-amber-500' : ''} />
             <span>{label}</span>
+            {highlight && (
+              <span className="ml-auto text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">NEW</span>
+            )}
           </NavLink>
         ))}
       </nav>
@@ -116,8 +123,8 @@ export default function Sidebar() {
         <div className="flex gap-1.5 flex-wrap">
           {isDoctor && (
             <button onClick={() => navigate('/doctor')}
-              className="flex items-center gap-1 text-[11px] text-teal-700 bg-teal-50 hover:bg-teal-100 py-1 px-2 rounded-lg transition-colors font-semibold">
-              <UserCog size={11} /> Doctor panel
+              className="flex items-center gap-1 text-[11px] text-teal-700 bg-teal-50 hover:bg-teal-100 py-1 px-2 rounded-lg font-semibold transition-colors">
+              <UserCog size={11} /> Doctor
             </button>
           )}
           <button onClick={() => navigate('/admin')}
