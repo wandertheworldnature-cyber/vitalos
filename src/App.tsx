@@ -10,6 +10,8 @@ import AuthPage from '@/pages/AuthPage'
 import OnboardingPage from '@/pages/OnboardingPage'
 import Dashboard from '@/pages/Dashboard'
 import LongevityPage from '@/pages/LongevityPage'
+import HabitsPage from '@/pages/HabitsPage'
+import HealthTimeline from '@/pages/HealthTimeline'
 import InsightsPage from '@/pages/InsightsPage'
 import TrendsPage from '@/pages/TrendsPage'
 import DoctorsPage from '@/pages/DoctorsPage'
@@ -73,6 +75,8 @@ export default function App() {
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
           <Route path="/dashboard"    element={<Dashboard />} />
           <Route path="/longevity"    element={<LongevityPage />} />
+          <Route path="/habits"       element={<HabitsPage />} />
+          <Route path="/timeline"     element={<HealthTimeline />} />
           <Route path="/health-data"  element={<HealthDataPage />} />
           <Route path="/insights"     element={<InsightsPage />} />
           <Route path="/trends"       element={<TrendsPage />} />
@@ -84,21 +88,21 @@ export default function App() {
 
         {/* Admin panel */}
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index                 element={<AdminOverview />} />
-          <Route path="users"          element={<AdminUsers />} />
-          <Route path="doctors"        element={<AdminDoctors />} />
-          <Route path="appointments"   element={<AdminAppointments />} />
-          <Route path="products"       element={<AdminProducts />} />
-          <Route path="announcements"  element={<AdminAnnouncements />} />
-          <Route path="analytics"      element={<AdminAnalytics />} />
+          <Route index                element={<AdminOverview />} />
+          <Route path="users"         element={<AdminUsers />} />
+          <Route path="doctors"       element={<AdminDoctors />} />
+          <Route path="appointments"  element={<AdminAppointments />} />
+          <Route path="products"      element={<AdminProducts />} />
+          <Route path="announcements" element={<AdminAnnouncements />} />
+          <Route path="analytics"     element={<AdminAnalytics />} />
         </Route>
 
         {/* Doctor panel */}
         <Route path="/doctor" element={<DoctorLayout />}>
-          <Route index                    element={<DoctorOverview />} />
-          <Route path="appointments"      element={<DoctorAppointments />} />
-          <Route path="patients"          element={<DoctorPatients />} />
-          <Route path="consultations"     element={<DoctorConsultations />} />
+          <Route index                element={<DoctorOverview />} />
+          <Route path="appointments"  element={<DoctorAppointments />} />
+          <Route path="patients"      element={<DoctorPatients />} />
+          <Route path="consultations" element={<DoctorConsultations />} />
         </Route>
 
         <Route path="/"  element={<Navigate to="/dashboard" replace />} />
