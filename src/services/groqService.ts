@@ -1,183 +1,117 @@
-// src/services/groqService.ts
-// Uses Groq (FREE) — Llama 3.3 70B for AI health insights and chat
-// Sign up: console.groq.com | Free tier: 14,400 req/day, 30 req/min
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const MODEL = 'llama-3.3-70b-versatile'
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = 'llama-3.3-70b-versatile' // Best free model on Groq
-
-function getGroqKey(): string {
-  const key = import.meta.env.VITE_GROQ_API_KEY
-  if (!key || key === 'gsk_your-groq-key') {
-    throw new Error('VITE_GROQ_API_KEY not set. Get a free key at console.groq.com')
-  }
-  return key
+function getKey() {
+  const k = import.meta.env.VITE_GROQ_API_KEY
+  if (!k || k.includes('your-groq')) throw new Error('VITE_GROQ_API_KEY not set')
+  return k
 }
 
-interface GroqMessage {
-  role: 'system' | 'user' | 'assistant'
-  content: string
-}
+const VITALOS_SYSTEM_PROMPT = `You are a preventive healthcare AI assistant for an app called VitalOS.
 
-async function groqChat(messages: GroqMessage[], maxTokens = 1500): Promise<string> {
-  const key = getGroqKey()
-  const res = await fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages,
-      max_tokens: maxTokens,
-      temperature: 0.3,
-    }),
-  })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error((err as { error?: { message?: string } }).error?.message || `Groq error ${res.status}`)
-  }
-
-  const data = await res.json() as { choices: { message: { content: string } }[] }
-  return data.choices[0]?.message?.content || ''
-}
-
-// ─── Health Insights ─────────────────────────────────────────────
-
-export interface AIInsightRaw {
-  severity: 'critical' | 'warning' | 'info' | 'good'
-  title: string
-  description: string
-  recommendation: string
-  risk_reduction?: string
-  related_metrics: string[]
-  timeframe?: string
-}
-
-export async function generateHealthInsights(
-  healthRecords: Array<{
-    test_name: string
-    value: number
-    unit: string
-    reference_min?: number
-    reference_max?: number
-    recorded_at: string
-  }>
-): Promise<AIInsightRaw[]> {
-  if (healthRecords.length === 0) return []
-
-  const summary = healthRecords
-    .slice(-60)
-    .map(r =>
-      `${r.test_name}: ${r.value} ${r.unit} (ref: ${r.reference_min ?? '?'}–${r.reference_max ?? '?'}) on ${r.recorded_at.split('T')[0]}`
-    )
-    .join('\n')
-
-  const content = await groqChat(
-    [
-      {
-        role: 'system',
-        content: `You are VitalOS, an AI health analyst for an Indian preventive health platform.
-Analyze health records and return ONLY a valid JSON array of 4–6 insights.
-Each insight object must have exactly these fields:
-- severity: "critical" | "warning" | "info" | "good"
-- title: string (max 60 chars)
-- description: string (max 120 chars, cite actual values)
-- recommendation: string (max 120 chars, specific India-relevant advice)
-- risk_reduction: string (optional, e.g. "−22% risk")
-- related_metrics: string[] (test names involved)
-- timeframe: string (optional, e.g. "18 months")
-Return ONLY the JSON array. No markdown, no explanation, no backticks.`,
-      },
-      {
-        role: 'user',
-        content: `Analyze these health records and return a JSON array of insights:\n\n${summary}`,
-      },
-    ],
-    1500
-  )
-
-  try {
-    const cleaned = content.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(cleaned)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    console.error('Groq JSON parse failed:', content)
-    return []
-  }
-}
-
-// ─── Chat ─────────────────────────────────────────────────────────
-
-export async function chatWithHealthAI(
-  userMessage: string,
-  conversationHistory: GroqMessage[],
-  insightContext: string
-): Promise<string> {
-  const messages: GroqMessage[] = [
-    {
-      role: 'system',
-      content: `You are VitalOS, a friendly AI health analyst for an Indian preventive health platform.
-Patient's current health insights:
-${insightContext}
+Your role:
+- Analyze user health data over time
+- Detect early risk patterns
+- Explain insights in simple, non-technical language
+- Suggest actionable next steps
 
 Rules:
-- Be concise (under 120 words), warm, and specific
-- Give practical India-relevant advice (Indian foods, lifestyle)
-- Never diagnose. Always suggest consulting a doctor for clinical decisions
-- Reference actual values from the insights when relevant`,
-    },
-    ...conversationHistory.slice(-8), // keep last 8 turns for context
-    { role: 'user', content: userMessage },
-  ]
+- Do NOT diagnose diseases
+- Do NOT create panic
+- Always give balanced, calm explanations
+- Highlight trends, not just single values
+- Compare with normal ranges and past data
+- Prioritize prevention and lifestyle suggestions
 
-  return groqChat(messages, 400)
+Output format (STRICT) for health analysis:
+1. Summary (1-2 lines)
+2. Key Observations (bullets)
+3. Risk Signals (if any)
+4. Recommended Actions (clear steps)
+5. When to Consult a Doctor (if needed)
+
+Tone:
+- Friendly, calm, supportive
+- Simple English (Indian users)
+- No jargon unless explained
+
+Always mention specific values from the data when available.
+Reference Indian foods, labs (Thyrocare, SRL, Apollo), and lifestyle habits when relevant.`
+
+export async function generateHealthInsights(records: Array<{
+  test_name: string; value: number; unit: string
+  reference_min?: number | null; reference_max?: number | null; recorded_at: string
+}>): Promise<Array<{
+  severity: 'critical'|'warning'|'info'|'good'
+  title: string; description: string; recommendation: string
+  risk_reduction?: string; related_metrics?: string[]; timeframe?: string
+}>> {
+  const key = getKey()
+  const recStr = records.map(r => {
+    const status = r.reference_max && r.value > r.reference_max ? 'HIGH'
+      : r.reference_min && r.value < r.reference_min ? 'LOW' : 'NORMAL'
+    return `${r.test_name}: ${r.value} ${r.unit} [${status}]${r.reference_min != null ? ` (normal: ${r.reference_min}-${r.reference_max})` : ''}`
+  }).join('\n')
+
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: VITALOS_SYSTEM_PROMPT },
+        { role: 'user', content: `Analyze these lab results and generate 4-6 health insights as JSON. Focus on trends and prevention.\n\nLab results:\n${recStr}\n\nReturn ONLY valid JSON array, no markdown:\n[{"severity":"critical|warning|info|good","title":"string","description":"2-3 sentences mentioning specific values and trends","recommendation":"specific Indian-relevant action steps","risk_reduction":"e.g. -30% diabetes risk","related_metrics":["string"],"timeframe":"e.g. 3 months"}]` }
+      ],
+      max_tokens: 2000,
+      temperature: 0.3,
+    })
+  })
+
+  if (!res.ok) throw new Error(`Groq API error: ${res.status}`)
+  const data = await res.json() as { choices: Array<{ message: { content: string } }> }
+  const text = data.choices?.[0]?.message?.content || ''
+  const cleaned = text.replace(/```json|```/g, '').trim()
+  const match = cleaned.match(/\[[\s\S]*\]/)
+  if (!match) return []
+  const parsed = JSON.parse(match[0])
+  return parsed.filter((i: { title?: unknown; description?: unknown }) => i.title && i.description)
 }
 
-// ─── Longevity Score ──────────────────────────────────────────────
+export async function chatWithHealthAI(
+  message: string,
+  history: Array<{ role: 'user'|'assistant'; content: string }>,
+  healthContext: string
+): Promise<string> {
+  const key = getKey()
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: `${VITALOS_SYSTEM_PROMPT}\n\nPATIENT DATA:\n${healthContext || 'No lab data yet — advise user to upload reports'}` },
+        ...history.slice(-10),
+        { role: 'user', content: message }
+      ],
+      max_tokens: 500,
+      temperature: 0.7,
+    })
+  })
+  if (!res.ok) throw new Error(`Groq API error: ${res.status}`)
+  const data = await res.json() as { choices: Array<{ message: { content: string } }> }
+  return data.choices?.[0]?.message?.content || 'I had trouble responding. Please try again.'
+}
 
-export async function computeLongevityScore(
-  healthRecords: Array<{
-    test_name: string
-    value: number
-    reference_min?: number
-    reference_max?: number
-  }>
-): Promise<{
-  score: number
-  change: number
-  breakdown: Record<string, number>
-}> {
-  if (healthRecords.length === 0) {
-    return { score: 70, change: 0, breakdown: { metabolic: 70, cardiovascular: 70, sleep: 70, activity: 70, nutrition: 70 } }
-  }
-
-  const content = await groqChat(
-    [
-      {
-        role: 'system',
-        content: `You compute a longevity/health score for an Indian health platform.
-Return ONLY a JSON object with:
-- score: integer 0–100
-- change: integer (positive = improving, negative = declining, based on trends)
-- breakdown: object with keys metabolic, cardiovascular, sleep, activity, nutrition each 0–100
-No markdown, no explanation. JSON only.`,
-      },
-      {
-        role: 'user',
-        content: `Compute score from these latest health values:\n${healthRecords
-          .map(r => `${r.test_name}: ${r.value} (ref ${r.reference_min ?? '?'}–${r.reference_max ?? '?'})`)
-          .join('\n')}`,
-      },
-    ],
-    300
-  )
-
-  try {
-    const cleaned = content.replace(/```json|```/g, '').trim()
-    return JSON.parse(cleaned)
-  } catch {
-    return { score: 72, change: 2, breakdown: { metabolic: 65, cardiovascular: 70, sleep: 58, activity: 80, nutrition: 68 } }
-  }
+export async function computeLongevityScore(records: Array<{
+  test_name: string; value: number; unit: string
+  reference_min?: number | null; reference_max?: number | null
+}>): Promise<{ score: number; change: number; breakdown: Record<string, number> }> {
+  const normal = records.filter(r => {
+    if (r.reference_max && r.value > r.reference_max) return false
+    if (r.reference_min && r.value < r.reference_min) return false
+    return true
+  }).length
+  const score = records.length > 0 ? Math.round((normal / records.length) * 40 + 55) : 65
+  const s = Math.min(95, Math.max(30, score))
+  return { score: s, change: 2, breakdown: { metabolic: s-5, cardiovascular: s-8, sleep: s+5, activity: s, nutrition: s-3 } }
 }

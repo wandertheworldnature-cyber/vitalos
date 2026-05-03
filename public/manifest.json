@@ -1,0 +1,32 @@
+{
+  "name": "VitalOS — Health Operating System",
+  "short_name": "VitalOS",
+  "description": "Your personal health OS — track lab reports, get AI insights, book doctors",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f0fdf8",
+  "theme_color": "#0f6e56",
+  "orientation": "portrait-primary",
+  "categories": ["health", "medical", "lifestyle"],
+  "lang": "en-IN",
+  "icons": [
+    { "src": "/icon-72.png",   "sizes": "72x72",   "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icon-96.png",   "sizes": "96x96",   "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icon-128.png",  "sizes": "128x128", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icon-144.png",  "sizes": "144x144", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icon-152.png",  "sizes": "152x152", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icon-192.png",  "sizes": "192x192", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icon-384.png",  "sizes": "384x384", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icon-512.png",  "sizes": "512x512", "type": "image/png", "purpose": "maskable any" }
+  ],
+  "screenshots": [
+    { "src": "/screenshot-mobile.png", "sizes": "390x844", "type": "image/png", "form_factor": "narrow" },
+    { "src": "/screenshot-desktop.png","sizes": "1280x800","type": "image/png", "form_factor": "wide" }
+  ],
+  "shortcuts": [
+    { "name": "Dashboard",       "url": "/dashboard",    "icons": [{"src":"/icon-96.png","sizes":"96x96"}] },
+    { "name": "Upload report",   "url": "/reports",      "icons": [{"src":"/icon-96.png","sizes":"96x96"}] },
+    { "name": "Find doctors",    "url": "/doctors",      "icons": [{"src":"/icon-96.png","sizes":"96x96"}] },
+    { "name": "Daily habits",    "url": "/habits",       "icons": [{"src":"/icon-96.png","sizes":"96x96"}] }
+  ]
+}
