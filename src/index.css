@@ -1,80 +1,20 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
-@layer base {
-  * { box-sizing: border-box; }
-  body {
-    font-family: 'Inter', system-ui, sans-serif;
-    background: #f0fdf8;
-    color: #1a1a1a;
-    margin: 0;
-    padding: 0;
-  }
+/* ── Mobile optimizations ──────────────────────────────────────── */
+@media (max-width: 767px) {
+  .card { @apply p-3.5 rounded-xl; }
+  .btn-primary { @apply px-4 py-2 rounded-lg text-sm; }
+  .btn-secondary { @apply px-3 py-2 rounded-lg text-sm; }
+  .input { @apply px-3 py-2.5 rounded-lg; }
+
+  /* Sidebar full screen on mobile overlay */
+  aside { height: 100vh; overflow-y: auto; }
+
+  /* Metric cards smaller on mobile */
+  .metric-value { font-size: 1.5rem; }
 }
 
-@layer components {
-  /* ── Cards ─────────────────────────────────────── */
-  .card {
-    @apply bg-white rounded-2xl border border-green-50 p-5;
-    box-shadow: 0 1px 3px rgba(15,110,86,0.06), 0 4px 16px rgba(15,110,86,0.04);
-  }
-  .card:hover { box-shadow: 0 2px 8px rgba(15,110,86,0.1), 0 8px 24px rgba(15,110,86,0.06); }
+/* Safe area for notches */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
-  /* ── Buttons ─────────────────────────────────────*/
-  .btn-primary {
-    @apply text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition-all;
-    background: linear-gradient(135deg, #0f6e56 0%, #1d9e75 100%);
-    box-shadow: 0 2px 8px rgba(15,110,86,0.3);
-  }
-  .btn-primary:hover {
-    background: linear-gradient(135deg, #0a5a46 0%, #0f8560 100%);
-    box-shadow: 0 4px 12px rgba(15,110,86,0.4);
-    transform: translateY(-1px);
-  }
-  .btn-primary:active { transform: translateY(0); }
-  .btn-primary:disabled { opacity: 0.6; transform: none; box-shadow: none; }
-
-  .btn-secondary {
-    @apply bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-xl font-medium text-sm hover:bg-gray-50 transition-all;
-  }
-
-  /* ── Inputs ──────────────────────────────────────*/
-  .input {
-    @apply w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm;
-    @apply focus:outline-none focus:ring-2 focus:border-teal-400;
-    --tw-ring-color: rgba(15,110,86,0.15);
-    background: #fafffe;
-  }
-  .input:hover { border-color: #a7f3d0; }
-
-  /* ── Badges ──────────────────────────────────────*/
-  .badge-red    { @apply bg-red-50 text-red-700 border border-red-100 text-xs px-2.5 py-1 rounded-lg font-semibold; }
-  .badge-amber  { @apply bg-amber-50 text-amber-700 border border-amber-100 text-xs px-2.5 py-1 rounded-lg font-semibold; }
-  .badge-green  { @apply bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs px-2.5 py-1 rounded-lg font-semibold; }
-  .badge-blue   { @apply bg-blue-50 text-blue-700 border border-blue-100 text-xs px-2.5 py-1 rounded-lg font-semibold; }
-
-  /* ── Sidebar ─────────────────────────────────────*/
-  .sidebar-item {
-    @apply flex items-center gap-3 px-4 py-2.5 text-sm text-gray-500 cursor-pointer transition-all mx-2 rounded-xl;
-  }
-  .sidebar-item:hover { @apply bg-emerald-50 text-emerald-700; }
-  .sidebar-item.active {
-    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
-    @apply text-emerald-700 font-semibold;
-    box-shadow: 0 1px 4px rgba(15,110,86,0.12);
-  }
-}
-
-/* ── Scrollbar ─────────────────────────────────────*/
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #a7f3d0; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #6ee7b7; }
-
-/* ── Animations ────────────────────────────────────*/
-@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-.animate-fadeIn { animation: fadeIn 0.3s ease; }
-
-@keyframes pulse-green { 0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); } 50% { box-shadow: 0 0 0 8px rgba(16,185,129,0); } }
-.pulse-green { animation: pulse-green 2s infinite; }
+/* Smooth page transitions */
+main > * { animation: fadeIn 0.2s ease; }

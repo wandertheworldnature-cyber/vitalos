@@ -3,15 +3,15 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      screens: {
+        'xs': '375px',
+        'sm': '640px',
+        'md': '768px',
+        'lg': '1024px',
+        'xl': '1280px',
+      },
       colors: {
-        teal: {
-          50: '#E1F5EE', 100: '#9FE1CB', 200: '#5DCAA5',
-          400: '#1D9E75', 600: '#0F6E56', 800: '#085041',
-        },
-        coral: {
-          50: '#FAECE7', 100: '#F5C4B3', 200: '#F0997B',
-          400: '#D85A30', 600: '#993C1D', 800: '#712B13',
-        },
+        brand: { DEFAULT: '#0f6e56', light: '#1d9e75', dark: '#0a5a46' }
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
