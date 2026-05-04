@@ -1,183 +1,222 @@
 import { useState } from 'react'
-import { Check, Zap, AlertCircle } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
-import { PLANS, openRazorpay } from '@/services/razorpayService'
-import toast from 'react-hot-toast'
+import { Check, Zap, Shield, Crown, Star } from 'lucide-react'
+
+const PLANS = [
+  {
+    id: 'basic',
+    name: 'Basic',
+    icon: Shield,
+    color: '#6b7280',
+    monthlyPrice: 499,
+    yearlyPrice: 3999,
+    yearlyMonthly: 333,
+    savings: 35,
+    features: [
+      'Health dashboard',
+      'Upload & store reports',
+      'Basic trend charts',
+      'Family members (2)',
+      'Manual health entries',
+      'AI chat (10/day)',
+    ],
+    cta: 'Current plan',
+    isCurrent: true,
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    icon: Zap,
+    color: '#0f6e56',
+    monthlyPrice: 999,
+    yearlyPrice: 8999,
+    yearlyMonthly: 750,
+    savings: 25,
+    popular: true,
+    features: [
+      'Everything in Basic',
+      'AI health insights',
+      'OCR report scanning',
+      'Doctor consultations (2/mo)',
+      'Family members (5)',
+      'Longevity Score',
+      'Daily habits tracker',
+      'Health timeline',
+      'Predictive alerts',
+    ],
+    cta: 'Upgrade to Pro',
+  },
+  {
+    id: 'premium',
+    name: 'Premium',
+    icon: Crown,
+    color: '#d97706',
+    monthlyPrice: 1999,
+    yearlyPrice: 12999,
+    yearlyMonthly: 1083,
+    savings: 46,
+    features: [
+      'Everything in Pro',
+      'Unlimited doctor consults',
+      'Annual full-body tests',
+      'Priority doctor access',
+      'Unlimited family members',
+      'WhatsApp alerts',
+      'Dedicated health coach',
+      'Advanced AI analysis',
+    ],
+    cta: 'Upgrade to Premium',
+  },
+]
 
 export default function SubscriptionPage() {
   const { user } = useAuthStore()
-  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
-  const [loading, setLoading] = useState<string | null>(null)
-  const [razorpayError, setRazorpayError] = useState(false)
+  const [yearly, setYearly] = useState(false)
+  const currentPlan = user?.plan || 'basic'
 
-  async function handleSubscribe(planId: string) {
-    if (!user) { toast.error('Please sign in first'); return }
-    if (user.plan === planId) { toast('You are already on this plan'); return }
-
-    setLoading(planId)
-    setRazorpayError(false)
-    try {
-      await openRazorpay({
-        plan: planId,
-        billingCycle: billing,
-        userId: user.id,
-        userName: user.full_name,
-        userEmail: user.email,
-        onSuccess: (paymentId) => {
-          toast.success(`Payment successful! Upgraded to ${planId.charAt(0).toUpperCase() + planId.slice(1)} plan.`)
-          toast(`Payment ID: ${paymentId.slice(0, 16)}...`, { icon: '🧾' })
-          // Refresh page to show new plan
-          setTimeout(() => window.location.reload(), 1500)
-        },
-        onFailure: () => {
-          toast.error('Payment cancelled')
-          setLoading(null)
-        },
-      })
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : ''
-      if (msg === 'RAZORPAY_NOT_CONFIGURED') {
-        setRazorpayError(true)
-        toast.error('Add VITE_RAZORPAY_KEY_ID to your .env file')
-      } else {
-        toast.error(`Payment error: ${msg}`)
-      }
-      setLoading(null)
-    }
+  function handleUpgrade(planId: string) {
+    if (planId === currentPlan) return
+    alert(`Razorpay payment for ${planId} plan — integrate your Razorpay key to enable payments.`)
   }
 
-  const savings = (plan: typeof PLANS[0]) =>
-    Math.round(((plan.price_monthly * 12 - plan.price_yearly) / (plan.price_monthly * 12)) * 100)
-
   return (
-    <div className="p-6 max-w-4xl">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-2">Choose your plan</h1>
-        <p className="text-gray-500 text-sm">Prevent diseases before they start. Cancel anytime.</p>
-
-        {/* Razorpay config warning */}
-        {razorpayError && (
-          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-left max-w-lg mx-auto">
-            <div className="flex gap-2">
-              <AlertCircle size={16} className="text-amber-600 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-amber-800 mb-1">Razorpay not configured</p>
-                <ol className="text-xs text-amber-700 space-y-0.5 list-decimal list-inside">
-                  <li>Go to <strong>dashboard.razorpay.com</strong> → Sign up free</li>
-                  <li>Settings → API Keys → Generate Test Key</li>
-                  <li>Add to your <strong>.env</strong> file: <code className="bg-amber-100 px-1 rounded">VITE_RAZORPAY_KEY_ID=rzp_test_xxx</code></li>
-                  <li>Restart the dev server (<code className="bg-amber-100 px-1 rounded">npm run dev</code>)</li>
-                </ol>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Billing toggle */}
-        <div className="flex items-center justify-center gap-3 mt-5">
-          <span className={`text-sm ${billing === 'monthly' ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>Monthly</span>
-          <button
-            onClick={() => setBilling(b => b === 'monthly' ? 'yearly' : 'monthly')}
-            className={`relative w-12 h-6 rounded-full transition-colors ${billing === 'yearly' ? 'bg-teal-500' : 'bg-gray-200'}`}
-          >
-            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${billing === 'yearly' ? 'translate-x-7' : 'translate-x-1'}`} />
-          </button>
-          <span className={`text-sm ${billing === 'yearly' ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
-            Yearly <span className="ml-1 text-xs text-teal-600 font-medium">Save up to 35%</span>
-          </span>
-        </div>
+    <div className="p-4 pb-8 max-w-lg mx-auto space-y-5">
+      {/* Header */}
+      <div className="text-center pt-2">
+        <h1 className="text-xl font-bold text-gray-900">Choose your plan</h1>
+        <p className="text-sm text-gray-500 mt-1">Prevent diseases before they start. Cancel anytime.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-5">
+      {/* Toggle */}
+      <div className="flex items-center justify-center gap-3">
+        <span className={`text-sm font-semibold ${!yearly ? 'text-gray-900' : 'text-gray-400'}`}>Monthly</span>
+        <button onClick={() => setYearly(y => !y)}
+          className="relative w-12 h-6 rounded-full transition-colors"
+          style={{ background: yearly ? 'linear-gradient(135deg,#0f6e56,#1d9e75)' : '#d1d5db' }}>
+          <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${yearly ? 'translate-x-6' : 'translate-x-0.5'}`} />
+        </button>
+        <span className={`text-sm font-semibold ${yearly ? 'text-gray-900' : 'text-gray-400'}`}>
+          Yearly{' '}
+          <span className="text-teal-600 font-bold">Save up to 46%</span>
+        </span>
+      </div>
+
+      {/* Plan cards — stacked on mobile */}
+      <div className="space-y-3">
         {PLANS.map(plan => {
-          const price = billing === 'monthly' ? plan.price_monthly : plan.price_yearly
-          const isCurrent = user?.plan === plan.id
-          const isLoading = loading === plan.id
+          const Icon = plan.icon
+          const isCurrent = currentPlan === plan.id
+          const price = yearly ? plan.yearlyMonthly : plan.monthlyPrice
 
           return (
-            <div key={plan.id} className={`card relative flex flex-col ${plan.highlight ? 'border-teal-400 ring-1 ring-teal-200' : ''}`}>
-              {plan.highlight && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="bg-teal-500 text-white text-[10px] font-semibold px-3 py-1 rounded-full flex items-center gap-1">
-                    <Zap size={10} /> Most popular
-                  </span>
+            <div key={plan.id}
+              className={`card !p-5 relative transition-all ${
+                plan.popular
+                  ? 'ring-2 border-transparent'
+                  : isCurrent ? 'border-gray-300' : ''
+              }`}
+              style={plan.popular ? { ringColor: plan.color, borderColor: plan.color } : {}}>
+
+              {/* Most popular badge */}
+              {plan.popular && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold text-white flex items-center gap-1"
+                  style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)' }}>
+                  <Star size={10} fill="white" /> Most popular
                 </div>
               )}
-              {isCurrent && (
-                <div className="absolute top-3 right-3">
-                  <span className="badge-green">Current plan</span>
+
+              {/* Plan header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ background: `${plan.color}15` }}>
+                    <Icon size={20} style={{ color: plan.color }} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-bold text-gray-900">{plan.name}</h2>
+                      {isCurrent && (
+                        <span className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.5 rounded-full font-bold">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-2xl font-black text-gray-900">₹{price.toLocaleString()}</span>
+                      <span className="text-xs text-gray-400">/mo</span>
+                    </div>
+                    {yearly && (
+                      <p className="text-[10px] text-gray-400">
+                        ₹{plan.yearlyPrice.toLocaleString()}/yr billed annually · Save {plan.savings}%
+                      </p>
+                    )}
+                  </div>
                 </div>
-              )}
-              <div className="mb-5">
-                <h2 className="text-base font-semibold text-gray-900 mb-1">{plan.name}</h2>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-gray-900">₹{price.toLocaleString('en-IN')}</span>
-                  <span className="text-sm text-gray-400">/{billing === 'monthly' ? 'mo' : 'yr'}</span>
-                </div>
-                {billing === 'yearly' && (
-                  <p className="text-xs text-teal-600 font-medium mt-1">Save {savings(plan)}% vs monthly</p>
-                )}
-                {billing === 'monthly' && (
-                  <p className="text-xs text-gray-400 mt-1">₹{plan.price_yearly.toLocaleString('en-IN')}/yr billed annually</p>
-                )}
               </div>
 
-              <ul className="space-y-2.5 flex-1 mb-6">
+              {/* Features */}
+              <div className="space-y-2 mb-4">
                 {plan.features.map(f => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-gray-600">
-                    <Check size={14} className="text-teal-500 mt-0.5 shrink-0" />
-                    {f}
-                  </li>
+                  <div key={f} className="flex items-start gap-2.5">
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                      style={{ background: `${plan.color}20` }}>
+                      <Check size={10} style={{ color: plan.color }} strokeWidth={3} />
+                    </div>
+                    <span className="text-xs text-gray-600 leading-relaxed">{f}</span>
+                  </div>
                 ))}
-              </ul>
+              </div>
 
+              {/* CTA */}
               <button
-                onClick={() => handleSubscribe(plan.id)}
-                disabled={isCurrent || isLoading}
-                className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                  isCurrent ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : plan.highlight ? 'bg-teal-500 text-white hover:bg-teal-600'
-                  : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
+                onClick={() => handleUpgrade(plan.id)}
+                disabled={isCurrent}
+                className={`w-full py-3 rounded-xl text-sm font-bold transition-all ${
+                  isCurrent
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'text-white'
                 }`}
-              >
-                {isLoading ? 'Opening payment...' : isCurrent ? 'Current plan' : `Get ${plan.name}`}
+                style={!isCurrent ? {
+                  background: `linear-gradient(135deg, ${plan.color}, ${plan.color}cc)`,
+                  boxShadow: `0 4px 12px ${plan.color}40`
+                } : {}}>
+                {isCurrent ? 'Current plan' : plan.cta}
               </button>
             </div>
           )
         })}
       </div>
 
-      <div className="mt-8 grid grid-cols-3 gap-4 text-center">
-        {[
-          { icon: '🔒', title: 'Secure payments', desc: 'Razorpay PCI-DSS compliant' },
-          { icon: '🏥', title: 'HIPAA-grade privacy', desc: 'Your health data stays yours' },
-          { icon: '↩️', title: 'Cancel anytime', desc: 'No lock-in, no hidden fees' },
-        ].map(t => (
-          <div key={t.title} className="card text-center">
-            <div className="text-2xl mb-2">{t.icon}</div>
-            <p className="text-xs font-semibold text-gray-900">{t.title}</p>
-            <p className="text-xs text-gray-400">{t.desc}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-8">
-        <h2 className="text-base font-semibold text-gray-900 mb-4">Frequently asked</h2>
-        <div className="space-y-3">
+      {/* Trust badges */}
+      <div className="card !p-4 text-center space-y-2">
+        <p className="text-xs font-bold text-gray-700">Why upgrade?</p>
+        <div className="grid grid-cols-2 gap-2">
           {[
-            { q: 'Can I upgrade later?', a: 'Yes — upgrade or downgrade anytime. Prorated billing handled automatically.' },
-            { q: 'Is my health data safe?', a: "All data encrypted at rest. We follow India's DPDP Act 2023. We never sell your data." },
-            { q: 'Which labs are integrated?', a: 'Thyrocare, SRL, Apollo Diagnostics, Metropolis, Sterling Accuris. More added quarterly.' },
-            { q: 'Are doctor consultations included?', a: 'Pro includes 2 consults/month. Premium is unlimited. Basic can purchase at ₹499/consult.' },
-          ].map(faq => (
-            <details key={faq.q} className="card cursor-pointer">
-              <summary className="text-sm font-medium text-gray-800 list-none flex items-center justify-between">
-                {faq.q} <span className="text-gray-400 text-lg">+</span>
-              </summary>
-              <p className="text-xs text-gray-500 mt-3 leading-relaxed">{faq.a}</p>
-            </details>
+            { e: '🔒', t: 'Cancel anytime' },
+            { e: '🇮🇳', t: 'Made for India' },
+            { e: '🔬', t: 'Thyrocare · SRL · Apollo' },
+            { e: '🤖', t: 'Groq AI — Free tier' },
+          ].map(b => (
+            <div key={b.t} className="bg-gray-50 rounded-lg px-3 py-2">
+              <span className="text-base">{b.e}</span>
+              <p className="text-[10px] text-gray-500 mt-0.5">{b.t}</p>
+            </div>
           ))}
         </div>
+      </div>
+
+      {/* FAQ */}
+      <div className="space-y-2">
+        {[
+          { q: 'Can I change plans later?', a: 'Yes, upgrade or downgrade anytime. Changes take effect immediately.' },
+          { q: 'Is my health data safe?', a: 'Yes. Data is encrypted and stored securely on Supabase. We never sell your data.' },
+          { q: 'How does AI analysis work?', a: 'We use Groq (Llama 3.3) to analyze your lab values and generate personalized insights — completely free on our end.' },
+        ].map(faq => (
+          <div key={faq.q} className="card !p-4">
+            <p className="text-xs font-bold text-gray-800 mb-1">{faq.q}</p>
+            <p className="text-xs text-gray-500 leading-relaxed">{faq.a}</p>
+          </div>
+        ))}
       </div>
     </div>
   )
