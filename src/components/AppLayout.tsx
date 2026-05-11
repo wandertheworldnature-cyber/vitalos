@@ -43,16 +43,17 @@ export default function AppLayout() {
       <main className={`flex-1 overflow-y-auto ${isMobile ? 'pb-20' : ''}`}>
         {isMobile && (
           <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 border-b border-emerald-100 bg-white">
-            <div className="flex items-center gap-2.5">
+            <button onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-2.5 active:opacity-70 transition-opacity">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center"
                 style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)' }}>
                 <span className="text-white text-xs font-bold">❤</span>
               </div>
-              <div>
+              <div className="text-left">
                 <p className="text-sm font-bold text-gray-900">VitalOS</p>
                 <p className="text-[10px] text-emerald-600">Health operating system</p>
               </div>
-            </div>
+            </button>
             <button onClick={() => setSidebarOpen(true)}
               className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center">
               <Menu size={18} className="text-gray-600" />
