@@ -17,6 +17,7 @@ import TrendsPage from '@/pages/TrendsPage'
 import DoctorsPage from '@/pages/DoctorsPage'
 import FamilyPage from '@/pages/FamilyPage'
 import HealthDataPage from '@/pages/HealthDataPage'
+import ProfilePage from '@/pages/ProfilePage'
 import ReportsPage from '@/pages/ReportsPage'
 import SubscriptionPage from '@/pages/SubscriptionPage'
 import ConsultationRoom from '@/pages/ConsultationRoom'
@@ -85,6 +86,7 @@ export default function App() {
           <Route path="/doctors"           element={<DoctorsPage/>}/>
           <Route path="/family"            element={<FamilyPage/>}/>
           <Route path="/reports"           element={<ReportsPage/>}/>
+          <Route path="/profile" element={<ProfilePage/>}/>
           <Route path="/subscription"      element={<SubscriptionPage/>}/>
           {/* Advanced premium routes */}
           <Route path="/advanced"          element={<AdvancedHub/>}/>
