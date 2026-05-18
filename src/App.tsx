@@ -17,12 +17,11 @@ import TrendsPage from '@/pages/TrendsPage'
 import DoctorsPage from '@/pages/DoctorsPage'
 import FamilyPage from '@/pages/FamilyPage'
 import HealthDataPage from '@/pages/HealthDataPage'
-import ProfilePage from '@/pages/ProfilePage'
 import ReportsPage from '@/pages/ReportsPage'
 import SubscriptionPage from '@/pages/SubscriptionPage'
+import ProfilePage from '@/pages/ProfilePage'
 import ConsultationRoom from '@/pages/ConsultationRoom'
 
-// Advanced premium features
 import AdvancedHub from '@/pages/advanced/AdvancedHub'
 import GeneticRiskPage from '@/pages/advanced/GeneticRiskPage'
 import StressScorePage from '@/pages/advanced/StressScorePage'
@@ -38,6 +37,7 @@ import AdminProducts from '@/pages/admin/AdminProducts'
 import AdminAnnouncements from '@/pages/admin/AdminAnnouncements'
 import AdminAnalytics from '@/pages/admin/AdminAnalytics'
 
+import DoctorLoginPage from '@/pages/doctor/DoctorLoginPage'
 import DoctorLayout from '@/pages/doctor/DoctorLayout'
 import DoctorOverview from '@/pages/doctor/DoctorOverview'
 import DoctorAppointments from '@/pages/doctor/DoctorAppointments'
@@ -70,30 +70,30 @@ export default function App() {
         style: { fontSize:'13px', borderRadius:'10px', border:'0.5px solid #e5e7eb', boxShadow:'0 4px 12px rgba(0,0,0,0.08)' }
       }}/>
       <Routes>
-        <Route path="/login"  element={<AuthPage />}/>
-        <Route path="/signup" element={<AuthPage />}/>
-        <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage/></ProtectedRoute>}/>
+        <Route path="/login"       element={<AuthPage />}/>
+        <Route path="/signup"      element={<AuthPage />}/>
+        <Route path="/doctor/login" element={<DoctorLoginPage />}/>
+        <Route path="/onboarding"  element={<ProtectedRoute><OnboardingPage/></ProtectedRoute>}/>
         <Route path="/consultation/:roomId" element={<ProtectedRoute><ConsultationRoom/></ProtectedRoute>}/>
 
         <Route element={<ProtectedRoute><AppLayout/></ProtectedRoute>}>
-          <Route path="/dashboard"         element={<Dashboard/>}/>
-          <Route path="/longevity"         element={<LongevityPage/>}/>
-          <Route path="/habits"            element={<HabitsPage/>}/>
-          <Route path="/timeline"          element={<HealthTimeline/>}/>
-          <Route path="/health-data"       element={<HealthDataPage/>}/>
-          <Route path="/insights"          element={<InsightsPage/>}/>
-          <Route path="/trends"            element={<TrendsPage/>}/>
-          <Route path="/doctors"           element={<DoctorsPage/>}/>
-          <Route path="/family"            element={<FamilyPage/>}/>
-          <Route path="/reports"           element={<ReportsPage/>}/>
-          <Route path="/profile" element={<ProfilePage/>}/>
-          <Route path="/subscription"      element={<SubscriptionPage/>}/>
-          {/* Advanced premium routes */}
-          <Route path="/advanced"          element={<AdvancedHub/>}/>
-          <Route path="/advanced/genetic"  element={<GeneticRiskPage/>}/>
-          <Route path="/advanced/stress"   element={<StressScorePage/>}/>
-          <Route path="/advanced/vo2max"   element={<VO2MaxPage/>}/>
-          <Route path="/advanced/gut"      element={<GutHealthPage/>}/>
+          <Route path="/dashboard"        element={<Dashboard/>}/>
+          <Route path="/longevity"        element={<LongevityPage/>}/>
+          <Route path="/habits"           element={<HabitsPage/>}/>
+          <Route path="/timeline"         element={<HealthTimeline/>}/>
+          <Route path="/health-data"      element={<HealthDataPage/>}/>
+          <Route path="/insights"         element={<InsightsPage/>}/>
+          <Route path="/trends"           element={<TrendsPage/>}/>
+          <Route path="/doctors"          element={<DoctorsPage/>}/>
+          <Route path="/family"           element={<FamilyPage/>}/>
+          <Route path="/reports"          element={<ReportsPage/>}/>
+          <Route path="/subscription"     element={<SubscriptionPage/>}/>
+          <Route path="/profile"          element={<ProfilePage/>}/>
+          <Route path="/advanced"         element={<AdvancedHub/>}/>
+          <Route path="/advanced/genetic" element={<GeneticRiskPage/>}/>
+          <Route path="/advanced/stress"  element={<StressScorePage/>}/>
+          <Route path="/advanced/vo2max"  element={<VO2MaxPage/>}/>
+          <Route path="/advanced/gut"     element={<GutHealthPage/>}/>
         </Route>
 
         <Route path="/admin" element={<AdminLayout/>}>
