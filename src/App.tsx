@@ -7,13 +7,11 @@ import { useAuthStore } from '@/store/authStore'
 import AppLayout from '@/components/AppLayout'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
-// Public pages (NO auth required)
 import AuthPage from '@/pages/AuthPage'
 import OnboardingPage from '@/pages/OnboardingPage'
 import ConsultationRoom from '@/pages/ConsultationRoom'
 import DoctorLoginPage from '@/pages/doctor/DoctorLoginPage'
 
-// App pages (auth required)
 import Dashboard from '@/pages/Dashboard'
 import LongevityPage from '@/pages/LongevityPage'
 import HabitsPage from '@/pages/HabitsPage'
@@ -27,14 +25,12 @@ import ReportsPage from '@/pages/ReportsPage'
 import SubscriptionPage from '@/pages/SubscriptionPage'
 import ProfilePage from '@/pages/ProfilePage'
 
-// Advanced
 import AdvancedHub from '@/pages/advanced/AdvancedHub'
 import GeneticRiskPage from '@/pages/advanced/GeneticRiskPage'
 import StressScorePage from '@/pages/advanced/StressScorePage'
 import VO2MaxPage from '@/pages/advanced/VO2MaxPage'
 import GutHealthPage from '@/pages/advanced/GutHealthPage'
 
-// Admin
 import AdminLayout from '@/pages/admin/AdminLayout'
 import AdminOverview from '@/pages/admin/AdminOverview'
 import AdminUsers from '@/pages/admin/AdminUsers'
@@ -44,7 +40,6 @@ import AdminProducts from '@/pages/admin/AdminProducts'
 import AdminAnnouncements from '@/pages/admin/AdminAnnouncements'
 import AdminAnalytics from '@/pages/admin/AdminAnalytics'
 
-// Doctor portal
 import DoctorLayout from '@/pages/doctor/DoctorLayout'
 import DoctorOverview from '@/pages/doctor/DoctorOverview'
 import DoctorAppointments from '@/pages/doctor/DoctorAppointments'
@@ -56,84 +51,77 @@ export default function App() {
   const bootDone = useRef(false)
 
   useEffect(() => {
-    // Safety timeout — if session check hangs, stop loading
     const timeout = setTimeout(() => {
       if (!bootDone.current) { bootDone.current = true; setUser(null) }
     }, 5000)
-
     supabase.auth.getSession().then(({ data: { session } }) => {
-      bootDone.current = true
-      clearTimeout(timeout)
+      bootDone.current = true; clearTimeout(timeout)
       if (session?.user) fetchProfile(session.user.id)
       else setUser(null)
     }).catch(() => { bootDone.current = true; clearTimeout(timeout); setUser(null) })
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') setUser(null)
       else if (event === 'TOKEN_REFRESHED' && session?.user) fetchProfile(session.user.id)
     })
-
     return () => { subscription.unsubscribe(); clearTimeout(timeout) }
   }, [])
 
   return (
     <BrowserRouter>
       <Toaster position="top-right" toastOptions={{
-        style: { fontSize:'13px', borderRadius:'10px', border:'0.5px solid #e5e7eb', boxShadow:'0 4px 12px rgba(0,0,0,0.08)' }
+        style:{ fontSize:'13px', borderRadius:'10px', border:'0.5px solid #e5e7eb', boxShadow:'0 4px 12px rgba(0,0,0,0.08)' }
       }}/>
       <Routes>
-        {/* ── PUBLIC ROUTES (no auth) ─────────────────────────── */}
-        <Route path="/login"        element={<AuthPage />}/>
-        <Route path="/signup"       element={<AuthPage />}/>
-        <Route path="/doctor/login" element={<DoctorLoginPage />}/>
+        {/* PUBLIC — no auth needed, listed FIRST */}
+        <Route path="/login"         element={<AuthPage/>}/>
+        <Route path="/signup"        element={<AuthPage/>}/>
+        <Route path="/doctor/login"  element={<DoctorLoginPage/>}/>
 
-        {/* ── SEMI-PUBLIC (auth required but simple) ──────────── */}
-        <Route path="/onboarding"            element={<ProtectedRoute><OnboardingPage/></ProtectedRoute>}/>
-        <Route path="/consultation/:roomId"  element={<ProtectedRoute><ConsultationRoom/></ProtectedRoute>}/>
+        <Route path="/onboarding"           element={<ProtectedRoute><OnboardingPage/></ProtectedRoute>}/>
+        <Route path="/consultation/:roomId" element={<ConsultationRoom/>}/>
 
-        {/* ── APP (auth + sidebar layout) ─────────────────────── */}
+        {/* MAIN APP */}
         <Route element={<ProtectedRoute><AppLayout/></ProtectedRoute>}>
-          <Route path="/dashboard"         element={<Dashboard/>}/>
-          <Route path="/longevity"         element={<LongevityPage/>}/>
-          <Route path="/habits"            element={<HabitsPage/>}/>
-          <Route path="/timeline"          element={<HealthTimeline/>}/>
-          <Route path="/health-data"       element={<HealthDataPage/>}/>
-          <Route path="/insights"          element={<InsightsPage/>}/>
-          <Route path="/trends"            element={<TrendsPage/>}/>
-          <Route path="/doctors"           element={<DoctorsPage/>}/>
-          <Route path="/family"            element={<FamilyPage/>}/>
-          <Route path="/reports"           element={<ReportsPage/>}/>
-          <Route path="/subscription"      element={<SubscriptionPage/>}/>
-          <Route path="/profile"           element={<ProfilePage/>}/>
-          <Route path="/advanced"          element={<AdvancedHub/>}/>
-          <Route path="/advanced/genetic"  element={<GeneticRiskPage/>}/>
-          <Route path="/advanced/stress"   element={<StressScorePage/>}/>
-          <Route path="/advanced/vo2max"   element={<VO2MaxPage/>}/>
-          <Route path="/advanced/gut"      element={<GutHealthPage/>}/>
+          <Route path="/dashboard"        element={<Dashboard/>}/>
+          <Route path="/longevity"        element={<LongevityPage/>}/>
+          <Route path="/habits"           element={<HabitsPage/>}/>
+          <Route path="/timeline"         element={<HealthTimeline/>}/>
+          <Route path="/health-data"      element={<HealthDataPage/>}/>
+          <Route path="/insights"         element={<InsightsPage/>}/>
+          <Route path="/trends"           element={<TrendsPage/>}/>
+          <Route path="/doctors"          element={<DoctorsPage/>}/>
+          <Route path="/family"           element={<FamilyPage/>}/>
+          <Route path="/reports"          element={<ReportsPage/>}/>
+          <Route path="/subscription"     element={<SubscriptionPage/>}/>
+          <Route path="/profile"          element={<ProfilePage/>}/>
+          <Route path="/advanced"         element={<AdvancedHub/>}/>
+          <Route path="/advanced/genetic" element={<GeneticRiskPage/>}/>
+          <Route path="/advanced/stress"  element={<StressScorePage/>}/>
+          <Route path="/advanced/vo2max"  element={<VO2MaxPage/>}/>
+          <Route path="/advanced/gut"     element={<GutHealthPage/>}/>
         </Route>
 
-        {/* ── ADMIN ───────────────────────────────────────────── */}
+        {/* ADMIN */}
         <Route path="/admin" element={<AdminLayout/>}>
-          <Route index                element={<AdminOverview/>}/>
-          <Route path="users"         element={<AdminUsers/>}/>
-          <Route path="doctors"       element={<AdminDoctors/>}/>
-          <Route path="appointments"  element={<AdminAppointments/>}/>
-          <Route path="products"      element={<AdminProducts/>}/>
-          <Route path="announcements" element={<AdminAnnouncements/>}/>
-          <Route path="analytics"     element={<AdminAnalytics/>}/>
+          <Route index               element={<AdminOverview/>}/>
+          <Route path="users"        element={<AdminUsers/>}/>
+          <Route path="doctors"      element={<AdminDoctors/>}/>
+          <Route path="appointments" element={<AdminAppointments/>}/>
+          <Route path="products"     element={<AdminProducts/>}/>
+          <Route path="announcements"element={<AdminAnnouncements/>}/>
+          <Route path="analytics"    element={<AdminAnalytics/>}/>
         </Route>
 
-        {/* ── DOCTOR PORTAL ───────────────────────────────────── */}
+        {/* DOCTOR PORTAL */}
         <Route path="/doctor" element={<DoctorLayout/>}>
-          <Route index                element={<DoctorOverview/>}/>
-          <Route path="appointments"  element={<DoctorAppointments/>}/>
-          <Route path="patients"      element={<DoctorPatients/>}/>
-          <Route path="consultations" element={<DoctorConsultations/>}/>
+          <Route index               element={<DoctorOverview/>}/>
+          <Route path="appointments" element={<DoctorAppointments/>}/>
+          <Route path="patients"     element={<DoctorPatients/>}/>
+          <Route path="consultations"element={<DoctorConsultations/>}/>
         </Route>
 
-        {/* ── FALLBACK ────────────────────────────────────────── */}
-        <Route path="/"  element={<Navigate to="/dashboard" replace/>}/>
-        <Route path="*"  element={<Navigate to="/dashboard" replace/>}/>
+        <Route path="/" element={<Navigate to="/dashboard" replace/>}/>
+        {/* No wildcard redirect — unknown URLs just go to dashboard */}
       </Routes>
     </BrowserRouter>
   )
