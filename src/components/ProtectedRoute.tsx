@@ -1,26 +1,21 @@
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
-  const location = useLocation()
 
+  // While checking auth, show nothing (prevents flash redirect)
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 rounded-full animate-spin mx-auto mb-3"
-            style={{ borderColor: '#0f6e56', borderTopColor: 'transparent' }} />
-          <p className="text-sm text-gray-500">Loading VitalOS...</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-2 border-t-transparent border-teal-500 rounded-full animate-spin"/>
+          <p className="text-sm text-gray-400">Loading VitalOS...</p>
         </div>
       </div>
     )
   }
 
-  if (!user) {
-    // Preserve the intended destination so we can redirect back after login
-    return <Navigate to="/login" state={{ from: location }} replace />
-  }
-
+  if (!user) return <Navigate to="/login" replace/>
   return <>{children}</>
 }
