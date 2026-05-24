@@ -1,26 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL  as string
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Missing Supabase env vars — using demo mode')
-}
-
-export const supabase = createClient(
-  supabaseUrl || 'https://hdoxnnzjzdejuxletqew.supabase.co',
-  supabaseAnonKey || 'demo-key',
-  {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-    },
-  }
-)
-
-// Helper to get current user
-export const getCurrentUser = async () => {
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error) throw error
-  return user
-}
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,        // store session in localStorage — survives tab close
+    autoRefreshToken: true,      // auto-refresh before token expires
+    detectSessionInUrl: true,    // handle magic link / OAuth redirects
+    storageKey: 'vitalos-auth',  // unique storage key
+  },
+})
