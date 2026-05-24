@@ -20,9 +20,9 @@ interface AuthStore {
 
 export const useAuthStore = create<AuthStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
-      loading: true,
+      loading: false,
 
       setUser: (user) => set({ user, loading: false }),
 
@@ -47,24 +47,37 @@ export const useAuthStore = create<AuthStore>()(
               },
               loading: false,
             })
+          } else if (authUser) {
+            // Profile might not exist yet — use auth data
+            set({
+              user: {
+                id: authUser.id,
+                email: authUser.email || '',
+                full_name: authUser.user_metadata?.full_name,
+                plan: 'basic',
+              },
+              loading: false,
+            })
           } else {
             set({ user: null, loading: false })
           }
         } catch {
-          set({ user: null, loading: false })
+          // Don't clear user on network error — keep existing session
+          set({ loading: false })
         }
       },
 
       signOut: async () => {
         await supabase.auth.signOut()
+        // Clear localStorage
+        localStorage.removeItem('vitalos-user')
+        localStorage.removeItem('vitalos-auth')
         set({ user: null, loading: false })
       },
     }),
     {
-      name: 'vitalos-user',        // localStorage key
-      partialize: (state) => ({    // only persist user, not loading
-        user: state.user,
-      }),
+      name: 'vitalos-user',
+      partialize: (state) => ({ user: state.user }), // only persist user object
     }
   )
 )
