@@ -1,199 +1,322 @@
 import { useEffect, useState } from 'react'
-import { TrendingUp, Info } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
-import { getTrendData, getLatestMetrics } from '@/services/healthService'
-import TrendChart from '@/components/TrendChart'
-import { useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
+import { TrendingUp, TrendingDown, Minus, Activity } from 'lucide-react'
 
-interface TrendPoint { date: string; value: number }
-interface MetricOption { key: string; unit: string; color: string; refMin?: number; refMax?: number }
+interface Record {
+  test_name: string
+  value: number
+  unit: string
+  reference_min: number | null
+  reference_max: number | null
+  recorded_at: string
+}
 
-const DEFAULT_METRICS: MetricOption[] = [
-  { key: 'Fasting Glucose',   unit: 'mg/dL',  color: '#E24B4A', refMin: 70,  refMax: 100  },
-  { key: 'LDL Cholesterol',   unit: 'mg/dL',  color: '#BA7517', refMin: 0,   refMax: 130  },
-  { key: 'Hemoglobin',        unit: 'g/dL',   color: '#D85A30', refMin: 12,  refMax: 17   },
-  { key: 'TSH',               unit: 'mIU/L',  color: '#1D9E75', refMin: 0.4, refMax: 4.0  },
-  { key: 'Vitamin D',         unit: 'ng/mL',  color: '#7F77DD', refMin: 30,  refMax: 100  },
-  { key: 'HbA1c',             unit: '%',      color: '#D4537E', refMin: 0,   refMax: 5.7  },
-  { key: 'Total Cholesterol', unit: 'mg/dL',  color: '#378ADD', refMin: 0,   refMax: 200  },
-  { key: 'HDL',               unit: 'mg/dL',  color: '#639922', refMin: 40,  refMax: 200  },
+interface MetricGroup {
+  name: string
+  unit: string
+  refMin: number | null
+  refMax: number | null
+  points: Array<{ date: string; value: number }>
+  latest: number
+  min: number
+  max: number
+  trend: 'up' | 'down' | 'stable'
+  trendPct: number
+  status: 'good' | 'warning' | 'critical'
+}
+
+const PERIODS = [
+  { label: '1y', days: 365 },
+  { label: '2y', days: 730 },
+  { label: '3y', days: 1095 },
 ]
+
+function calcStatus(val: number, min: number | null, max: number | null): MetricGroup['status'] {
+  if (min == null && max == null) return 'good'
+  if ((max != null && val > max * 1.15) || (min != null && val < min * 0.85)) return 'critical'
+  if ((max != null && val > max) || (min != null && val < min)) return 'warning'
+  return 'good'
+}
+
+const STATUS_CONFIG = {
+  good:     { color: '#10b981', bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-700', label: 'Good'     },
+  warning:  { color: '#f59e0b', bg: 'bg-amber-50',   badge: 'bg-amber-100 text-amber-700',   label: 'Watch'    },
+  critical: { color: '#ef4444', bg: 'bg-red-50',     badge: 'bg-red-100 text-red-700',       label: 'High Risk' },
+}
+
+// Simple SVG line chart
+function LineChart({ points, refMin, refMax, color }: {
+  points: Array<{ date: string; value: number }>
+  refMin: number | null
+  refMax: number | null
+  color: string
+}) {
+  if (points.length < 1) return null
+  const W = 320, H = 120, PAD = 20
+
+  const vals = points.map(p => p.value)
+  const allVals = [...vals, ...(refMin ? [refMin] : []), ...(refMax ? [refMax] : [])]
+  const minV = Math.min(...allVals) * 0.95
+  const maxV = Math.max(...allVals) * 1.05
+  const range = maxV - minV || 1
+
+  const toX = (i: number) => PAD + (i / Math.max(points.length - 1, 1)) * (W - PAD * 2)
+  const toY = (v: number) => H - PAD - ((v - minV) / range) * (H - PAD * 2)
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(i)} ${toY(p.value)}`).join(' ')
+  const areaPath = `${linePath} L ${toX(points.length - 1)} ${H - PAD} L ${toX(0)} ${H - PAD} Z`
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 120 }}>
+      {/* Reference band */}
+      {refMin != null && refMax != null && (
+        <rect
+          x={PAD} y={toY(refMax)}
+          width={W - PAD * 2} height={Math.abs(toY(refMin) - toY(refMax))}
+          fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.15)" strokeWidth="1"
+        />
+      )}
+      {/* Area fill */}
+      <path d={areaPath} fill={`${color}18`}/>
+      {/* Line */}
+      <path d={linePath} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Data points */}
+      {points.map((p, i) => (
+        <circle key={i} cx={toX(i)} cy={toY(p.value)} r="3.5"
+          fill="#fff" stroke={color} strokeWidth="2"/>
+      ))}
+      {/* Latest value label */}
+      {points.length > 0 && (
+        <text
+          x={toX(points.length - 1)} y={toY(points[points.length - 1].value) - 8}
+          textAnchor="middle" fontSize="11" fill={color} fontWeight="700">
+          {points[points.length - 1].value}
+        </text>
+      )}
+    </svg>
+  )
+}
 
 export default function TrendsPage() {
   const { user } = useAuthStore()
-  const navigate = useNavigate()
-  const [availableMetrics, setAvailableMetrics] = useState<MetricOption[]>([])
-  const [selected, setSelected] = useState<MetricOption | null>(null)
-  const [trendData, setTrendData] = useState<TrendPoint[]>([])
-  const [timeRange, setTimeRange] = useState<'1y'|'2y'|'3y'>('1y')
+  const [metrics, setMetrics] = useState<MetricGroup[]>([])
+  const [selected, setSelected] = useState<string>('')
+  const [period, setPeriod] = useState(0) // index into PERIODS
   const [loading, setLoading] = useState(true)
-  const [loadingTrend, setLoadingTrend] = useState(false)
 
-  useEffect(() => { if (user) loadAvailable() }, [user])
-  useEffect(() => { if (user && selected) loadTrend() }, [user, selected, timeRange])
+  useEffect(() => { if (user) load() }, [user, period])
 
-  async function loadAvailable() {
+  async function load() {
     if (!user) return
     setLoading(true)
     try {
-      const metrics = await getLatestMetrics(user.id)
-      if (metrics.length === 0) { setLoading(false); return }
+      const since = new Date()
+      since.setDate(since.getDate() - PERIODS[period].days)
 
-      const opts: MetricOption[] = metrics.map(m => {
-        const preset = DEFAULT_METRICS.find(d =>
-          d.key.toLowerCase() === m.test_name.toLowerCase() ||
-          m.test_name.toLowerCase().includes(d.key.toLowerCase().split(' ')[0])
+      // Fetch all records in the period — no record_type filter
+      const { data, error } = await supabase
+        .from('health_records')
+        .select('test_name, value, unit, reference_min, reference_max, recorded_at')
+        .eq('user_id', user.id)
+        .gte('recorded_at', since.toISOString())
+        .order('recorded_at', { ascending: true })
+
+      if (error) { console.error('Trends fetch error:', error); setLoading(false); return }
+      if (!data?.length) { setMetrics([]); setLoading(false); return }
+
+      // Group by test_name
+      const groups = new Map<string, Record[]>()
+      for (const r of data) {
+        const key = r.test_name.trim()
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key)!.push(r as Record)
+      }
+
+      const result: MetricGroup[] = []
+      for (const [name, recs] of groups) {
+        const sorted = recs.sort((a, b) =>
+          new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
         )
-        return {
-          key: m.test_name,
-          unit: m.unit,
-          color: preset?.color || '#1D9E75',
-          refMin: m.reference_min ?? preset?.refMin,
-          refMax: m.reference_max ?? preset?.refMax,
-        }
+        const vals = sorted.map(r => r.value)
+        const latest = vals[vals.length - 1]
+        const first = vals[0]
+        const trendPct = first !== 0 ? +((latest - first) / Math.abs(first) * 100).toFixed(1) : 0
+        const trend: MetricGroup['trend'] = Math.abs(trendPct) < 2 ? 'stable' : trendPct > 0 ? 'up' : 'down'
+        const refMin = sorted[sorted.length - 1].reference_min
+        const refMax = sorted[sorted.length - 1].reference_max
+
+        result.push({
+          name,
+          unit: sorted[0].unit || '',
+          refMin,
+          refMax,
+          points: sorted.map(r => ({
+            date: r.recorded_at.split('T')[0],
+            value: r.value,
+          })),
+          latest,
+          min: Math.min(...vals),
+          max: Math.max(...vals),
+          trend,
+          trendPct: Math.abs(trendPct),
+          status: calcStatus(latest, refMin, refMax),
+        })
+      }
+
+      // Sort: critical first, then warning, then good
+      result.sort((a, b) => {
+        const order = { critical: 0, warning: 1, good: 2 }
+        return order[a.status] - order[b.status]
       })
-      setAvailableMetrics(opts)
-      if (opts.length > 0) setSelected(opts[0])
-    } catch (e) { console.error(e) }
+
+      setMetrics(result)
+      if (!selected && result.length > 0) setSelected(result[0].name)
+    } catch (e) { console.error('Trends error:', e) }
     finally { setLoading(false) }
   }
 
-  async function loadTrend() {
-    if (!user || !selected) return
-    setLoadingTrend(true)
-    try {
-      const raw = await getTrendData(user.id, selected.key)
-      const cutoff = new Date()
-      cutoff.setFullYear(cutoff.getFullYear() - parseInt(timeRange))
-      setTrendData(raw.filter(d => new Date(d.date) >= cutoff))
-    } catch { setTrendData([]) }
-    finally { setLoadingTrend(false) }
-  }
-
-  const latestVal  = trendData[trendData.length - 1]?.value
-  const firstVal   = trendData[0]?.value
-  const totalPct   = latestVal && firstVal ? ((latestVal - firstVal) / firstVal * 100).toFixed(1) : null
-  const isRising   = totalPct && parseFloat(totalPct) > 0
-
-  const isHighRisk = selected && selected.refMax != null && latestVal != null && latestVal > selected.refMax
+  const active = metrics.find(m => m.name === selected)
+  const cfg = active ? STATUS_CONFIG[active.status] : null
 
   return (
-    <div className="p-6 max-w-5xl space-y-6">
-      <div className="flex items-center gap-3">
-        <TrendingUp size={20} className="text-teal-500" />
-        <h1 className="text-xl font-bold text-gray-900">Health trends</h1>
-        <span className="text-sm text-gray-400">Longitudinal view over time</span>
+    <div className="p-4 md:p-6 max-w-5xl space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <TrendingUp size={18} className="text-teal-600"/> Health trends
+          </h1>
+          <p className="text-xs text-gray-400 mt-0.5">Longitudinal view over time</p>
+        </div>
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          {PERIODS.map((p, i) => (
+            <button key={p.label} onClick={() => setPeriod(i)}
+              className={`text-xs px-3 py-1.5 rounded-md font-semibold transition-colors ${period === i ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
-        <div className="card text-center py-12">
-          <div className="w-8 h-8 border-2 border-t-transparent border-teal-400 rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-gray-400">Loading your health data...</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {[1,2,3,4,5,6,7,8].map(i => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse"/>)}
         </div>
-      ) : availableMetrics.length === 0 ? (
-        <div className="card border-dashed border-2 border-gray-200 text-center py-12">
-          <TrendingUp size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-gray-600">No trend data yet</p>
-          <p className="text-xs text-gray-400 mt-1 mb-4">
-            Upload at least one lab report to see trends
-          </p>
-          <button onClick={() => navigate('/reports')} className="btn-primary text-xs py-2">
-            Upload lab report
-          </button>
+      ) : metrics.length === 0 ? (
+        <div className="card border-dashed border-2 border-gray-200 text-center py-16">
+          <Activity size={36} className="text-gray-200 mx-auto mb-3"/>
+          <p className="text-sm font-semibold text-gray-600 mb-1">No health data for this period</p>
+          <p className="text-xs text-gray-400 mb-4">Upload a lab report or add readings manually to see trends</p>
+          <a href="/reports" className="btn-primary text-xs py-2 inline-block">Upload report</a>
         </div>
       ) : (
         <>
-          {/* Metric selector */}
-          <div className="grid grid-cols-4 gap-2">
-            {availableMetrics.slice(0, 8).map(m => {
-              const data = trendData
-              const latest = selected?.key === m.key ? latestVal : undefined
+          {/* Metric selector grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {metrics.map(m => {
+              const c = STATUS_CONFIG[m.status]
+              const isActive = selected === m.name
               return (
-                <button key={m.key} onClick={() => setSelected(m)}
-                  className={`text-left p-3 rounded-xl border transition-all ${
-                    selected?.key === m.key
-                      ? 'border-teal-400 bg-teal-50'
-                      : 'border-gray-100 bg-white hover:border-gray-200'
-                  }`}>
-                  <p className="text-[10px] text-gray-400 mb-1 truncate">{m.key}</p>
-                  {latest != null ? (
-                    <>
-                      <p className="text-sm font-bold text-gray-900">{latest} <span className="text-[10px] text-gray-400">{m.unit}</span></p>
-                      {totalPct && selected?.key === m.key && (
-                        <p className={`text-[10px] font-semibold ${isRising && isHighRisk ? 'text-red-500' : 'text-teal-500'}`}>
-                          {isRising ? '↑' : '↓'} {Math.abs(parseFloat(totalPct))}%
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-xs text-gray-300">No data</p>
-                  )}
+                <button key={m.name} onClick={() => setSelected(m.name)}
+                  className={`rounded-xl p-3 text-left border transition-all ${isActive ? 'ring-2 shadow-sm' : 'hover:shadow-sm'}`}
+                  style={isActive
+                    ? { borderColor: c.color, ringColor: c.color, background: `${c.color}08` }
+                    : { borderColor: '#e5e7eb', background: '#fff' }}>
+                  <p className="text-[10px] text-gray-500 truncate mb-1">{m.name}</p>
+                  <p className="text-lg font-black text-gray-900 leading-tight">
+                    {m.latest}
+                    <span className="text-[10px] text-gray-400 font-normal ml-1">{m.unit}</span>
+                  </p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${c.badge}`}>{c.label}</span>
+                    {m.points.length > 1 && (
+                      <span className={`text-[9px] font-semibold ${m.trend === 'up' ? 'text-red-500' : m.trend === 'down' ? 'text-emerald-600' : 'text-gray-400'}`}>
+                        {m.trend === 'up' ? '↑' : m.trend === 'down' ? '↓' : '→'}{m.trendPct}%
+                      </span>
+                    )}
+                  </div>
                 </button>
               )
             })}
           </div>
 
-          {/* Main chart */}
-          {selected && (
-            <div className="card">
-              <div className="flex items-center justify-between mb-4">
+          {/* Chart */}
+          {active && cfg && (
+            <div className="card !p-5">
+              <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
                 <div>
-                  <h2 className="text-sm font-bold text-gray-900">{selected.key}</h2>
-                  <p className="text-xs text-gray-400">
-                    {selected.refMin != null && selected.refMax != null
-                      ? `Reference: ${selected.refMin}–${selected.refMax} ${selected.unit}`
-                      : `Unit: ${selected.unit}`}
-                    {totalPct && (
-                      <span className={`ml-2 font-semibold ${isRising && isHighRisk ? 'text-red-500' : isRising ? 'text-amber-500' : 'text-teal-500'}`}>
-                        {isRising ? '↑' : '↓'} {Math.abs(parseFloat(totalPct))}% over {timeRange}
-                      </span>
-                    )}
-                  </p>
+                  <h2 className="text-base font-bold text-gray-900">{active.name}</h2>
+                  {(active.refMin != null || active.refMax != null) && (
+                    <p className="text-xs text-gray-400">
+                      Reference: {active.refMin != null ? active.refMin : '—'}–{active.refMax != null ? active.refMax : '—'} {active.unit}
+                    </p>
+                  )}
                 </div>
-                <div className="flex gap-1">
-                  {(['1y','2y','3y'] as const).map(r => (
-                    <button key={r} onClick={() => setTimeRange(r)}
-                      className={`text-xs px-3 py-1 rounded-lg ${timeRange === r ? 'bg-gray-900 text-white' : 'border border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
-                      {r}
-                    </button>
+                <div className="flex gap-3">
+                  {[
+                    { label: 'Latest', val: active.latest },
+                    { label: 'Min', val: active.min },
+                    { label: 'Max', val: active.max },
+                  ].map(s => (
+                    <div key={s.label} className="text-center">
+                      <div className="text-sm font-black text-gray-900">{s.val}</div>
+                      <div className="text-[10px] text-gray-400">{s.label}</div>
+                    </div>
                   ))}
                 </div>
               </div>
 
-              {loadingTrend ? (
-                <div className="h-60 flex items-center justify-center">
-                  <div className="w-6 h-6 border-2 border-t-transparent border-teal-400 rounded-full animate-spin" />
+              {active.points.length < 2 ? (
+                <div className="py-8 text-center">
+                  <p className="text-xs text-gray-400">Only 1 data point — upload more reports to see a trend line</p>
+                  <div className="mt-4">
+                    <div className="w-3 h-3 rounded-full mx-auto mb-2" style={{ background: cfg.color }}/>
+                    <p className="text-sm font-bold text-gray-700">{active.latest} {active.unit}</p>
+                    <p className="text-xs text-gray-400">{active.points[0]?.date}</p>
+                  </div>
                 </div>
               ) : (
-                <TrendChart data={trendData} label={selected.key} color={selected.color}
-                  referenceMin={selected.refMin} referenceMax={selected.refMax}
-                  unit={selected.unit} height={260} />
+                <>
+                  <LineChart
+                    points={active.points}
+                    refMin={active.refMin}
+                    refMax={active.refMax}
+                    color={cfg.color}
+                  />
+                  {/* X-axis dates */}
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[10px] text-gray-400">{active.points[0]?.date}</span>
+                    {active.points.length > 2 && (
+                      <span className="text-[10px] text-gray-400">
+                        {active.points[Math.floor(active.points.length / 2)]?.date}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-gray-400">{active.points[active.points.length - 1]?.date}</span>
+                  </div>
+                </>
               )}
 
-              {trendData.length > 0 && (
-                <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-100">
-                  {[
-                    { label: 'Latest',      value: `${trendData[trendData.length-1]?.value} ${selected.unit}` },
-                    { label: 'Min (period)', value: `${Math.min(...trendData.map(d=>d.value))} ${selected.unit}` },
-                    { label: 'Max (period)', value: `${Math.max(...trendData.map(d=>d.value))} ${selected.unit}` },
-                    { label: 'Tests logged', value: `${trendData.length}` },
-                  ].map(s => (
-                    <div key={s.label}>
-                      <p className="text-[10px] text-gray-400">{s.label}</p>
-                      <p className="text-sm font-bold text-gray-900">{s.value}</p>
-                    </div>
-                  ))}
+              {/* Trend summary */}
+              <div className={`mt-4 p-3 rounded-xl flex items-center gap-3 ${cfg.bg}`}>
+                {active.trend === 'up' ? <TrendingUp size={16} style={{ color: cfg.color }}/> :
+                 active.trend === 'down' ? <TrendingDown size={16} style={{ color: cfg.color }}/> :
+                 <Minus size={16} style={{ color: cfg.color }}/>}
+                <div>
+                  <p className="text-xs font-bold text-gray-700">
+                    {active.trend === 'stable' ? 'Stable' :
+                     active.trend === 'up' ? `↑ Rising ${active.trendPct}% over period` :
+                     `↓ Declining ${active.trendPct}% over period`}
+                    {' '}· {active.points.length} reading{active.points.length !== 1 ? 's' : ''}
+                  </p>
+                  {active.refMin != null && active.refMax != null && (
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      {active.latest < active.refMin ? `Below minimum (${active.refMin} ${active.unit})` :
+                       active.latest > active.refMax ? `Above maximum (${active.refMax} ${active.unit})` :
+                       'Within normal range'}
+                    </p>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
-
-          {trendData.length < 2 && (
-            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-xl p-4">
-              <Info size={15} className="text-blue-500 mt-0.5 shrink-0" />
-              <p className="text-xs text-blue-700">
-                Upload more lab reports over time to see trend lines. The more reports you upload, the more insightful your health trends become.
-              </p>
+              </div>
             </div>
           )}
         </>
