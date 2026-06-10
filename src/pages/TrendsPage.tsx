@@ -41,55 +41,42 @@ function calcStatus(val: number, min: number | null, max: number | null): Metric
 
 const STATUS_CONFIG = {
   good:     { color: '#10b981', bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-700', label: 'Good'     },
-  warning:  { color: '#f59e0b', bg: 'bg-amber-50',   badge: 'bg-amber-100 text-amber-700',   label: 'Watch'    },
-  critical: { color: '#ef4444', bg: 'bg-red-50',     badge: 'bg-red-100 text-red-700',       label: 'High Risk' },
+  warning:  { color: '#f59e0b', bg: 'bg-amber-50',   badge: 'bg-amber-100 text-amber-700',    label: 'Watch'    },
+  critical: { color: '#ef4444', bg: 'bg-red-50',     badge: 'bg-red-100 text-red-700',        label: 'High Risk'},
 }
 
-// Simple SVG line chart
 function LineChart({ points, refMin, refMax, color }: {
   points: Array<{ date: string; value: number }>
   refMin: number | null
   refMax: number | null
   color: string
 }) {
-  if (points.length < 1) return null
+  if (!points || points.length < 1) return null
   const W = 320, H = 120, PAD = 20
-
   const vals = points.map(p => p.value)
-  const allVals = [...vals, ...(refMin ? [refMin] : []), ...(refMax ? [refMax] : [])]
+  const allVals = [...vals, ...(refMin != null ? [refMin] : []), ...(refMax != null ? [refMax] : [])]
   const minV = Math.min(...allVals) * 0.95
   const maxV = Math.max(...allVals) * 1.05
   const range = maxV - minV || 1
-
   const toX = (i: number) => PAD + (i / Math.max(points.length - 1, 1)) * (W - PAD * 2)
   const toY = (v: number) => H - PAD - ((v - minV) / range) * (H - PAD * 2)
-
   const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(i)} ${toY(p.value)}`).join(' ')
   const areaPath = `${linePath} L ${toX(points.length - 1)} ${H - PAD} L ${toX(0)} ${H - PAD} Z`
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 120 }}>
-      {/* Reference band */}
       {refMin != null && refMax != null && (
-        <rect
-          x={PAD} y={toY(refMax)}
-          width={W - PAD * 2} height={Math.abs(toY(refMin) - toY(refMax))}
-          fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.15)" strokeWidth="1"
-        />
+        <rect x={PAD} y={toY(refMax)} width={W - PAD * 2}
+          height={Math.abs(toY(refMin) - toY(refMax))}
+          fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.15)" strokeWidth="1"/>
       )}
-      {/* Area fill */}
       <path d={areaPath} fill={`${color}18`}/>
-      {/* Line */}
       <path d={linePath} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-      {/* Data points */}
       {points.map((p, i) => (
-        <circle key={i} cx={toX(i)} cy={toY(p.value)} r="3.5"
-          fill="#fff" stroke={color} strokeWidth="2"/>
+        <circle key={i} cx={toX(i)} cy={toY(p.value)} r="3.5" fill="#fff" stroke={color} strokeWidth="2"/>
       ))}
-      {/* Latest value label */}
       {points.length > 0 && (
-        <text
-          x={toX(points.length - 1)} y={toY(points[points.length - 1].value) - 8}
+        <text x={toX(points.length - 1)} y={toY(points[points.length - 1].value) - 8}
           textAnchor="middle" fontSize="11" fill={color} fontWeight="700">
           {points[points.length - 1].value}
         </text>
@@ -100,80 +87,97 @@ function LineChart({ points, refMin, refMax, color }: {
 
 export default function TrendsPage() {
   const { user } = useAuthStore()
+  const [allRecords, setAllRecords] = useState<Record[]>([])
   const [metrics, setMetrics] = useState<MetricGroup[]>([])
   const [selected, setSelected] = useState<string>('')
-  const [period, setPeriod] = useState(0) // index into PERIODS
+  const [period, setPeriod] = useState(0)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { if (user) load() }, [user, period])
+  // Fetch ALL records once on mount
+  useEffect(() => {
+    if (user) fetchAll()
+  }, [user])
 
-  async function load() {
+  // Re-group when period changes
+  useEffect(() => {
+    if (allRecords.length > 0) buildMetrics(allRecords)
+  }, [allRecords, period])
+
+  async function fetchAll() {
     if (!user) return
     setLoading(true)
     try {
-      const since = new Date()
-      since.setDate(since.getDate() - PERIODS[period].days)
-
-      // Fetch all records in the period — no record_type filter
+      // Fetch ALL records — no date filter, no type filter
       const { data, error } = await supabase
         .from('health_records')
         .select('test_name, value, unit, reference_min, reference_max, recorded_at')
         .eq('user_id', user.id)
-        .gte('recorded_at', since.toISOString())
         .order('recorded_at', { ascending: true })
 
-      if (error) { console.error('Trends fetch error:', error); setLoading(false); return }
-      if (!data?.length) { setMetrics([]); setLoading(false); return }
+      if (error) { console.error('Trends error:', error); setLoading(false); return }
+      console.log('Trends: total records from DB:', data?.length)
+      setAllRecords((data || []) as Record[])
+    } catch (e) {
+      console.error('Trends fetch exception:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-      // Group by test_name
-      const groups = new Map<string, Record[]>()
-      for (const r of data) {
-        const key = r.test_name.trim()
-        if (!groups.has(key)) groups.set(key, [])
-        groups.get(key)!.push(r as Record)
-      }
+  function buildMetrics(records: Record[]) {
+    // Apply period filter client-side
+    const since = new Date()
+    since.setDate(since.getDate() - PERIODS[period].days)
+    let filtered = records.filter(r => new Date(r.recorded_at) >= since)
 
-      const result: MetricGroup[] = []
-      for (const [name, recs] of groups) {
-        const sorted = recs.sort((a, b) =>
-          new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
-        )
-        const vals = sorted.map(r => r.value)
-        const latest = vals[vals.length - 1]
-        const first = vals[0]
-        const trendPct = first !== 0 ? +((latest - first) / Math.abs(first) * 100).toFixed(1) : 0
-        const trend: MetricGroup['trend'] = Math.abs(trendPct) < 2 ? 'stable' : trendPct > 0 ? 'up' : 'down'
-        const refMin = sorted[sorted.length - 1].reference_min
-        const refMax = sorted[sorted.length - 1].reference_max
+    // If period filter removes everything, show all data regardless
+    if (filtered.length === 0) filtered = records
 
-        result.push({
-          name,
-          unit: sorted[0].unit || '',
-          refMin,
-          refMax,
-          points: sorted.map(r => ({
-            date: r.recorded_at.split('T')[0],
-            value: r.value,
-          })),
-          latest,
-          min: Math.min(...vals),
-          max: Math.max(...vals),
-          trend,
-          trendPct: Math.abs(trendPct),
-          status: calcStatus(latest, refMin, refMax),
-        })
-      }
+    // Group by test_name
+    const groups = new Map<string, Record[]>()
+    for (const r of filtered) {
+      const key = r.test_name.trim()
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(r)
+    }
 
-      // Sort: critical first, then warning, then good
-      result.sort((a, b) => {
-        const order = { critical: 0, warning: 1, good: 2 }
-        return order[a.status] - order[b.status]
+    const result: MetricGroup[] = []
+    for (const [name, recs] of groups) {
+      const sorted = [...recs].sort((a, b) =>
+        new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
+      )
+      const vals = sorted.map(r => Number(r.value))
+      const latest = vals[vals.length - 1]
+      const first = vals[0]
+      const trendPct = first !== 0 ? +((latest - first) / Math.abs(first) * 100).toFixed(1) : 0
+      const trend: MetricGroup['trend'] = Math.abs(trendPct) < 2 ? 'stable' : trendPct > 0 ? 'up' : 'down'
+      const refMin = sorted[sorted.length - 1].reference_min
+      const refMax = sorted[sorted.length - 1].reference_max
+
+      result.push({
+        name,
+        unit: sorted[0].unit || '',
+        refMin,
+        refMax,
+        points: sorted.map(r => ({ date: r.recorded_at.split('T')[0], value: Number(r.value) })),
+        latest,
+        min: Math.min(...vals),
+        max: Math.max(...vals),
+        trend,
+        trendPct: Math.abs(trendPct),
+        status: calcStatus(latest, refMin, refMax),
       })
+    }
 
-      setMetrics(result)
-      if (!selected && result.length > 0) setSelected(result[0].name)
-    } catch (e) { console.error('Trends error:', e) }
-    finally { setLoading(false) }
+    result.sort((a, b) => {
+      const order = { critical: 0, warning: 1, good: 2 }
+      return order[a.status] - order[b.status]
+    })
+
+    setMetrics(result)
+    if (result.length > 0 && (!selected || !result.find(m => m.name === selected))) {
+      setSelected(result[0].name)
+    }
   }
 
   const active = metrics.find(m => m.name === selected)
@@ -181,12 +185,14 @@ export default function TrendsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-5xl space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <TrendingUp size={18} className="text-teal-600"/> Health trends
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Longitudinal view over time</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {allRecords.length > 0 ? `${metrics.length} metrics · ${allRecords.length} total readings` : 'Longitudinal view over time'}
+          </p>
         </div>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
           {PERIODS.map((p, i) => (
@@ -205,13 +211,13 @@ export default function TrendsPage() {
       ) : metrics.length === 0 ? (
         <div className="card border-dashed border-2 border-gray-200 text-center py-16">
           <Activity size={36} className="text-gray-200 mx-auto mb-3"/>
-          <p className="text-sm font-semibold text-gray-600 mb-1">No health data for this period</p>
-          <p className="text-xs text-gray-400 mb-4">Upload a lab report or add readings manually to see trends</p>
+          <p className="text-sm font-semibold text-gray-600 mb-1">No health data found</p>
+          <p className="text-xs text-gray-400 mb-4">Upload a lab report to see your trends</p>
           <a href="/reports" className="btn-primary text-xs py-2 inline-block">Upload report</a>
         </div>
       ) : (
         <>
-          {/* Metric selector grid */}
+          {/* Metric cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {metrics.map(m => {
               const c = STATUS_CONFIG[m.status]
@@ -220,7 +226,7 @@ export default function TrendsPage() {
                 <button key={m.name} onClick={() => setSelected(m.name)}
                   className={`rounded-xl p-3 text-left border transition-all ${isActive ? 'ring-2 shadow-sm' : 'hover:shadow-sm'}`}
                   style={isActive
-                    ? { borderColor: c.color, ringColor: c.color, background: `${c.color}08` }
+                    ? { borderColor: c.color, background: `${c.color}08` }
                     : { borderColor: '#e5e7eb', background: '#fff' }}>
                   <p className="text-[10px] text-gray-500 truncate mb-1">{m.name}</p>
                   <p className="text-lg font-black text-gray-900 leading-tight">
@@ -248,16 +254,12 @@ export default function TrendsPage() {
                   <h2 className="text-base font-bold text-gray-900">{active.name}</h2>
                   {(active.refMin != null || active.refMax != null) && (
                     <p className="text-xs text-gray-400">
-                      Reference: {active.refMin != null ? active.refMin : '—'}–{active.refMax != null ? active.refMax : '—'} {active.unit}
+                      Reference: {active.refMin ?? '—'}–{active.refMax ?? '—'} {active.unit}
                     </p>
                   )}
                 </div>
-                <div className="flex gap-3">
-                  {[
-                    { label: 'Latest', val: active.latest },
-                    { label: 'Min', val: active.min },
-                    { label: 'Max', val: active.max },
-                  ].map(s => (
+                <div className="flex gap-4">
+                  {[{ label: 'Latest', val: active.latest }, { label: 'Min', val: active.min }, { label: 'Max', val: active.max }].map(s => (
                     <div key={s.label} className="text-center">
                       <div className="text-sm font-black text-gray-900">{s.val}</div>
                       <div className="text-[10px] text-gray-400">{s.label}</div>
@@ -268,35 +270,21 @@ export default function TrendsPage() {
 
               {active.points.length < 2 ? (
                 <div className="py-8 text-center">
-                  <p className="text-xs text-gray-400">Only 1 data point — upload more reports to see a trend line</p>
-                  <div className="mt-4">
-                    <div className="w-3 h-3 rounded-full mx-auto mb-2" style={{ background: cfg.color }}/>
-                    <p className="text-sm font-bold text-gray-700">{active.latest} {active.unit}</p>
-                    <p className="text-xs text-gray-400">{active.points[0]?.date}</p>
-                  </div>
+                  <div className="w-4 h-4 rounded-full mx-auto mb-3" style={{ background: cfg.color }}/>
+                  <p className="text-sm font-bold text-gray-700">{active.latest} {active.unit}</p>
+                  <p className="text-xs text-gray-400 mt-1">{active.points[0]?.date}</p>
+                  <p className="text-xs text-gray-400 mt-3">Upload more reports to see trend line</p>
                 </div>
               ) : (
                 <>
-                  <LineChart
-                    points={active.points}
-                    refMin={active.refMin}
-                    refMax={active.refMax}
-                    color={cfg.color}
-                  />
-                  {/* X-axis dates */}
+                  <LineChart points={active.points} refMin={active.refMin} refMax={active.refMax} color={cfg.color}/>
                   <div className="flex justify-between mt-1">
                     <span className="text-[10px] text-gray-400">{active.points[0]?.date}</span>
-                    {active.points.length > 2 && (
-                      <span className="text-[10px] text-gray-400">
-                        {active.points[Math.floor(active.points.length / 2)]?.date}
-                      </span>
-                    )}
                     <span className="text-[10px] text-gray-400">{active.points[active.points.length - 1]?.date}</span>
                   </div>
                 </>
               )}
 
-              {/* Trend summary */}
               <div className={`mt-4 p-3 rounded-xl flex items-center gap-3 ${cfg.bg}`}>
                 {active.trend === 'up' ? <TrendingUp size={16} style={{ color: cfg.color }}/> :
                  active.trend === 'down' ? <TrendingDown size={16} style={{ color: cfg.color }}/> :
@@ -304,8 +292,8 @@ export default function TrendsPage() {
                 <div>
                   <p className="text-xs font-bold text-gray-700">
                     {active.trend === 'stable' ? 'Stable' :
-                     active.trend === 'up' ? `↑ Rising ${active.trendPct}% over period` :
-                     `↓ Declining ${active.trendPct}% over period`}
+                     active.trend === 'up' ? `↑ Rising ${active.trendPct}%` :
+                     `↓ Declining ${active.trendPct}%`}
                     {' '}· {active.points.length} reading{active.points.length !== 1 ? 's' : ''}
                   </p>
                   {active.refMin != null && active.refMax != null && (
