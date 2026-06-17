@@ -9,7 +9,6 @@ interface ApptInfo {
   doctor_specialty: string
   slot_date: string
   slot_time: string
-  meeting_link: string | null
 }
 
 export default function ConsultationRoom() {
@@ -18,41 +17,32 @@ export default function ConsultationRoom() {
   const navigate = useNavigate()
   const [apptInfo, setApptInfo] = useState<ApptInfo | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [joined, setJoined] = useState(false)
 
-  // Generate a stable Google Meet-style room link from roomId
-  // We use a hash of the roomId to create a consistent 3-part meet code
-  const getRoomCode = (id: string) => {
-    const clean = id.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
-    const p1 = clean.slice(0, 3) || 'abc'
-    const p2 = clean.slice(3, 7) || 'defg'
-    const p3 = clean.slice(7, 10) || 'hij'
-    return `${p1}-${p2}-${p3}`
-  }
-  const meetCode = getRoomCode(roomId || '')
-  const meetUrl = `https://meet.google.com/${meetCode}`
-  const consultationUrl = `${window.location.origin}/consultation/${roomId}`
+  // Jitsi direct URL — patient opens first = auto moderator, no login screen
+  // Key: no dashes in room name, short alphanumeric only
+  const clean = (roomId || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+  const jitsiRoom = `vitalos${clean}`
+  const jitsiUrl  = `https://meet.jit.si/${jitsiRoom}`
+  const shareUrl  = `${window.location.origin}/consultation/${roomId}`
 
   useEffect(() => { if (roomId) loadInfo() }, [roomId])
 
   async function loadInfo() {
-    setLoading(true)
-    // Try to find appointment by any meeting link format
     const { data } = await supabase.from('appointments')
-      .select('slot_date,slot_time,meeting_link,doctor:doctors(name,specialty,hospital)')
+      .select('slot_date,slot_time,doctor:doctors(name,specialty)')
       .or(`meeting_link.eq.https://meet.jit.si/VitalOS-${roomId},meeting_link.like.%${roomId}%`)
       .maybeSingle()
     if (data) {
-      const doc = data.doctor as unknown as { name: string; specialty: string; hospital: string }
-      setApptInfo({
-        doctor_name: doc?.name || 'Doctor',
-        doctor_specialty: doc?.specialty || '',
-        slot_date: data.slot_date,
-        slot_time: data.slot_time,
-        meeting_link: data.meeting_link,
-      })
+      const doc = data.doctor as unknown as { name: string; specialty: string }
+      setApptInfo({ doctor_name: doc?.name || 'Doctor', doctor_specialty: doc?.specialty || '', slot_date: data.slot_date, slot_time: data.slot_time })
     }
-    setLoading(false)
+  }
+
+  function openMeeting() {
+    // Open Jitsi in new tab — first person to open becomes moderator automatically
+    window.open(jitsiUrl, '_blank', 'noopener,noreferrer')
+    setJoined(true)
   }
 
   function copy(text: string, label: string) {
@@ -62,18 +52,12 @@ export default function ConsultationRoom() {
   }
 
   function whatsapp() {
-    const msg = `Join my VitalOS video consultation 🎥\n\nI'm starting the Google Meet now — click to join:\n${meetUrl}\n\nNo account needed to join!`
+    const msg = `🎥 Join my VitalOS video consultation\n\nClick to join — no login needed, just open in browser:\n${jitsiUrl}\n\n(Room: ${jitsiRoom})`
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
-  function openMeet() {
-    window.open(meetUrl, '_blank', 'noopener,noreferrer')
-  }
-
   const dateStr = apptInfo
-    ? new Date(apptInfo.slot_date + 'T00:00:00').toLocaleDateString('en-IN', {
-        weekday: 'short', day: 'numeric', month: 'long'
-      })
+    ? new Date(apptInfo.slot_date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long' })
     : ''
 
   return (
@@ -92,7 +76,7 @@ export default function ConsultationRoom() {
             </p>
             <p className="text-[10px] text-emerald-400 flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse inline-block" />
-              Room {roomId}
+              Room: {jitsiRoom}
               {apptInfo && <span className="text-gray-500 ml-1">· {dateStr} {apptInfo.slot_time?.slice(0,5)}</span>}
             </p>
           </div>
@@ -117,92 +101,85 @@ export default function ConsultationRoom() {
               <div className="min-w-0">
                 <p className="text-base font-black text-white truncate">{apptInfo.doctor_name}</p>
                 <p className="text-sm text-emerald-400">{apptInfo.doctor_specialty}</p>
-                <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                  <Calendar size={10} /> {dateStr} · {apptInfo.slot_time?.slice(0, 5)}
-                </p>
+                {apptInfo && (
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                    <Calendar size={10} /> {dateStr} · {apptInfo.slot_time?.slice(0, 5)}
+                  </p>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* Google Meet CTA */}
-        <div className="w-full rounded-2xl p-5"
-          style={{ background: 'rgba(66,133,244,0.1)', border: '1px solid rgba(66,133,244,0.25)' }}>
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-2xl">🎥</span>
-            <div>
-              <p className="text-sm font-bold text-white">Google Meet</p>
-              <p className="text-xs text-blue-300">Free · No time limit for 1:1 calls · No account needed to join</p>
-            </div>
-          </div>
-          <p className="text-xs text-gray-400 mb-4 leading-relaxed">
-            You start the meeting. Share the link with your doctor — they join with one click, no Google account needed.
+        {/* Important instruction */}
+        <div className="w-full rounded-xl p-4"
+          style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)' }}>
+          <p className="text-xs font-bold text-amber-400 mb-2">⚡ Important — read before joining</p>
+          <p className="text-xs text-amber-200 leading-relaxed">
+            <strong>You must open the meeting first</strong> before sharing the link with your doctor. 
+            The first person to open the room becomes the host automatically — no login needed.
           </p>
-          <button onClick={openMeet}
-            className="w-full py-3.5 rounded-xl font-bold text-base text-white flex items-center justify-center gap-2 mb-3"
-            style={{ background: 'linear-gradient(135deg,#1a73e8,#4285f4)', boxShadow: '0 6px 24px rgba(66,133,244,0.4)' }}>
-            <ExternalLink size={18} /> Start Google Meet
-          </button>
-          <p className="text-[11px] text-gray-500 text-center">Opens in new tab — you become the host automatically</p>
         </div>
+
+        {/* Steps */}
+        <div className="w-full rounded-xl p-4"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="text-xs font-bold text-gray-400 mb-3">How to start your call</p>
+          {[
+            ['1', 'Tap "Open video call" — Jitsi opens in new tab'],
+            ['2', 'You are now host — no waiting, no login required'],
+            ['3', 'Come back here, copy doctor link, send via WhatsApp'],
+            ['4', 'Doctor opens the link → joins your room directly'],
+          ].map(([n, t]) => (
+            <div key={n} className="flex items-start gap-2.5 mb-2 last:mb-0">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                style={{ background: 'rgba(29,158,117,0.4)' }}>{n}</span>
+              <p className="text-xs text-gray-300 leading-relaxed">{t}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Join button */}
+        <button onClick={openMeeting}
+          className="w-full py-4 rounded-2xl font-black text-lg text-white flex items-center justify-center gap-3 transition-all active:scale-95"
+          style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)', boxShadow: '0 8px 32px rgba(15,110,86,0.5)' }}>
+          <ExternalLink size={20} />
+          {joined ? 'Rejoin video call' : 'Open video call'}
+        </button>
+
+        {joined && (
+          <div className="w-full flex items-center gap-2 rounded-xl p-3"
+            style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+            <Check size={14} className="text-emerald-400 shrink-0" />
+            <p className="text-xs text-emerald-300">Meeting opened! Now share the doctor link below.</p>
+          </div>
+        )}
 
         {/* Share links */}
         <div className="w-full space-y-3">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Share with doctor</p>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Send to doctor</p>
 
-          {/* Google Meet link */}
           <div className="rounded-xl p-3"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <p className="text-[10px] text-gray-400 font-bold mb-2">🩺 Google Meet link (share this)</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-[11px] text-blue-300 break-all leading-relaxed">{meetUrl}</code>
+            <p className="text-[10px] text-gray-400 font-bold mb-2">🩺 Direct meeting link (share this with doctor)</p>
+            <div className="flex items-start gap-2">
+              <code className="flex-1 text-[11px] text-teal-300 break-all leading-relaxed">{jitsiUrl}</code>
               <div className="flex flex-col gap-1.5 shrink-0">
-                <button onClick={() => copy(meetUrl, 'meet')}
-                  className="flex items-center gap-1 text-[11px] text-white bg-blue-700 hover:bg-blue-600 px-2.5 py-1.5 rounded-lg">
-                  {copied === 'meet' ? <><Check size={10} />Copied</> : <><Copy size={10} />Copy</>}
+                <button onClick={() => copy(jitsiUrl, 'jitsi')}
+                  className="flex items-center gap-1 text-[11px] text-white bg-teal-700 px-2.5 py-1.5 rounded-lg whitespace-nowrap">
+                  {copied === 'jitsi' ? <><Check size={10}/>Copied</> : <><Copy size={10}/>Copy</>}
                 </button>
                 <button onClick={whatsapp}
-                  className="flex items-center justify-center text-[11px] text-white bg-green-700 px-2.5 py-1.5 rounded-lg">
+                  className="text-[11px] text-white bg-green-700 px-2.5 py-1.5 rounded-lg whitespace-nowrap text-center">
                   📲 WhatsApp
                 </button>
               </div>
             </div>
           </div>
-
-          {/* VitalOS link */}
-          <div className="rounded-xl p-3"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <p className="text-[10px] text-gray-400 font-bold mb-2">🔗 VitalOS consultation page</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-[11px] text-teal-300 break-all">{consultationUrl}</code>
-              <button onClick={() => copy(consultationUrl, 'vitalos')}
-                className="flex items-center gap-1 text-[11px] text-white bg-teal-700 px-2.5 py-1.5 rounded-lg shrink-0">
-                {copied === 'vitalos' ? <><Check size={10} />Copied</> : <><Copy size={10} />Copy</>}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* How it works */}
-        <div className="w-full rounded-xl p-4"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <p className="text-xs font-bold text-gray-400 mb-3">How it works</p>
-          {[
-            ['1', 'Click "Start Google Meet" — you become host'],
-            ['2', 'Copy the Meet link and send to doctor via WhatsApp'],
-            ['3', 'Doctor clicks link — joins instantly, no Google login needed'],
-            ['4', 'Start your consultation!'],
-          ].map(([n, t]) => (
-            <div key={n} className="flex items-start gap-2.5 mb-2 last:mb-0">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                style={{ background: 'rgba(255,255,255,0.1)' }}>{n}</span>
-              <p className="text-xs text-gray-400">{t}</p>
-            </div>
-          ))}
         </div>
 
         <p className="text-[10px] text-gray-600 text-center pb-4">
-          Google Meet · Free unlimited 1:1 calls · No time limit · Works on all devices
+          Jitsi Meet · Free · No account needed · Works on all devices
         </p>
       </div>
     </div>
