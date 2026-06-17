@@ -1,72 +1,125 @@
-const corsHeaders={
-  'Access-Control-Allow-Origin':'*',
-  'Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type',
-}
-Deno.serve(async(req)=>{
-  if(req.method==='OPTIONS')return new Response('ok',{headers:corsHeaders})
-  try{
-    const{appointmentId,type}=await req.json()
-    const url=Deno.env.get('SUPABASE_URL')!
-    const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const resend=Deno.env.get('RESEND_API_KEY')
-    const admin=Deno.env.get('ADMIN_EMAIL')||'appireddy.vidusolutions@gmail.com'
-    const res=await fetch(`${url}/rest/v1/appointments?id=eq.${appointmentId}&select=*,doctor:doctors(name,specialty,hospital,doctor_email,notify_by_email),profile:profiles(full_name,email)`,
-      {headers:{apikey:key,Authorization:`Bearer ${key}`}})
-    const[appt]=await res.json()
-    if(!appt)throw new Error('not found')
-    const pat=appt.profile?.full_name||appt.profile?.email||'Patient'
-    const doc=appt.doctor?.name||'Doctor'
-    const spec=appt.doctor?.specialty||''
-    const hosp=appt.doctor?.hospital||''
-    const date=new Date(appt.slot_date).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
-    const time=(appt.slot_time||'').slice(0,5)
-    const link=appt.meeting_link||''
-    const ok=type!=='cancelled'
-    const subj=ok?`Appointment confirmed — ${doc} on ${date}`:`Appointment cancelled — ${doc}`
-    const subjDoc=ok?`New booking: ${pat} — ${date} at ${time}`:`Cancellation: ${pat} — ${date}`
-    const subjAdmin=`[VitalOS] ${ok?'Booked':'Cancelled'}: ${pat} ↔ ${doc}`
-    const body=(role:'patient'|'doctor'|'admin')=>`<!DOCTYPE html><html><body style="font-family:Inter,Arial,sans-serif;background:#f0fdf8;padding:20px;">
-<div style="max-width:560px;margin:0 auto;">
-<div style="background:linear-gradient(135deg,#0f6e56,#1d9e75);padding:24px;border-radius:12px 12px 0 0;">
-<h2 style="color:white;margin:0;">VitalOS</h2>
-<p style="color:#86efcb;margin:4px 0 0;font-size:13px;">Your health operating system</p>
-</div>
-<div style="background:white;border:1px solid #d1fae5;border-top:none;padding:28px;border-radius:0 0 12px 12px;">
-<h3 style="margin-top:0;">${ok?'✅ Appointment Confirmed':'❌ Appointment Cancelled'}</h3>
-<p>${role==='patient'?`Hi ${pat}, your consultation has been ${ok?'confirmed':'cancelled'}.`:role==='doctor'?`Hi ${doc}, you have a ${ok?'new booking':'cancellation'} on VitalOS.`:`[ADMIN] ${ok?'New booking':'Cancellation'}: ${pat} ↔ ${doc}`}</p>
-<div style="background:${ok?'#f0fdf4':'#fef2f2'};border:1px solid ${ok?'#a7f3d0':'#fecaca'};border-radius:10px;padding:16px;margin:16px 0;">
-<table style="width:100%;font-size:14px;border-collapse:collapse;">
-<tr><td style="color:#6b7280;padding:5px 0;font-weight:600;width:120px;">Doctor</td><td style="font-weight:700;">${doc}</td></tr>
-<tr><td style="color:#6b7280;padding:5px 0;font-weight:600;">Specialty</td><td>${spec}</td></tr>
-${hosp?`<tr><td style="color:#6b7280;padding:5px 0;font-weight:600;">Hospital</td><td>${hosp}</td></tr>`:''}
-<tr><td style="color:#6b7280;padding:5px 0;font-weight:600;">Patient</td><td style="font-weight:600;">${pat}</td></tr>
-<tr><td style="color:#6b7280;padding:5px 0;font-weight:600;">Date</td><td style="font-weight:700;color:#0f6e56;">${date}</td></tr>
-<tr><td style="color:#6b7280;padding:5px 0;font-weight:600;">Time</td><td style="font-weight:700;color:#0f6e56;">${time}</td></tr>
-<tr><td style="color:#6b7280;padding:5px 0;font-weight:600;">Mode</td><td>📹 Video consultation</td></tr>
-</table>
-</div>
-${ok&&link?`<div style="text-align:center;margin:20px 0;"><a href="${link}" style="background:linear-gradient(135deg,#0f6e56,#1d9e75);color:white;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;">🎥 Join Video Call</a><p style="color:#9ca3af;font-size:12px;margin-top:8px;">Link: ${link}</p></div>`:''}
-<p style="color:#9ca3af;font-size:11px;margin-top:24px;border-top:1px solid #f3f4f6;padding-top:16px;">Sent by VitalOS on behalf of ${doc}. The consultation is conducted by ${doc}.<br/>Support: support@vitalos.in</p>
-</div></div></body></html>`
-    async function mail(to:string,s:string,h:string){
-      if(!resend){console.log('No RESEND_API_KEY, skip:',to);return}
-      const r=await fetch('https://api.resend.com/emails',{
-        method:'POST',
-        headers:{'Content-Type':'application/json',Authorization:`Bearer ${resend}`},
-        body:JSON.stringify({from:'VitalOS <onboarding@resend.dev>',to:[to],subject:s,html:h})
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') || ''
+
+serve(async (req) => {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  try {
+    const { 
+      patient_email, patient_name, doctor_name, doctor_specialty,
+      hospital, slot_date, slot_time, room_id, mode 
+    } = await req.json()
+
+    // Generate VitalOS consultation link (not Jitsi)
+    const consultationLink = `https://vitalos-six.vercel.app/consultation/${room_id}`
+    
+    const dateStr = new Date(slot_date + 'T00:00:00').toLocaleDateString('en-IN', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    })
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/></head>
+<body style="margin:0;padding:0;background:#f0fdf8;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#0f6e56,#1d9e75);padding:32px;text-align:center;">
+      <div style="display:inline-flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div style="width:36px;height:36px;background:rgba(255,255,255,0.2);border-radius:10px;display:inline-flex;align-items:center;justify-content:center;">❤️</div>
+        <span style="font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.5px;">VitalOS</span>
+      </div>
+      <p style="color:rgba(255,255,255,0.7);font-size:13px;margin:0;">Your Health Operating System</p>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:32px;">
+      <h1 style="font-size:22px;font-weight:800;color:#0f2a1e;margin:0 0 8px;">Consultation Confirmed ✅</h1>
+      <p style="color:#6b7280;font-size:15px;margin:0 0 28px;">Hi ${patient_name}, your appointment has been booked successfully.</p>
+
+      <!-- Details card -->
+      <div style="background:#f0fdf8;border:1px solid #a7f3d0;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:8px 0;border-bottom:1px solid #d1fae5;color:#6b7280;font-size:13px;width:120px;">Doctor</td>
+              <td style="padding:8px 0;border-bottom:1px solid #d1fae5;font-weight:700;color:#0f2a1e;font-size:14px;">Dr. ${doctor_name}</td></tr>
+          <tr><td style="padding:8px 0;border-bottom:1px solid #d1fae5;color:#6b7280;font-size:13px;">Specialty</td>
+              <td style="padding:8px 0;border-bottom:1px solid #d1fae5;color:#374151;font-size:14px;">${doctor_specialty}</td></tr>
+          <tr><td style="padding:8px 0;border-bottom:1px solid #d1fae5;color:#6b7280;font-size:13px;">Hospital</td>
+              <td style="padding:8px 0;border-bottom:1px solid #d1fae5;color:#374151;font-size:14px;">${hospital || 'VitalOS Clinic'}</td></tr>
+          <tr><td style="padding:8px 0;border-bottom:1px solid #d1fae5;color:#6b7280;font-size:13px;">Patient</td>
+              <td style="padding:8px 0;border-bottom:1px solid #d1fae5;color:#374151;font-size:14px;">${patient_name}</td></tr>
+          <tr><td style="padding:8px 0;border-bottom:1px solid #d1fae5;color:#6b7280;font-size:13px;">Date</td>
+              <td style="padding:8px 0;border-bottom:1px solid #d1fae5;font-weight:700;color:#0f6e56;font-size:14px;">${dateStr}</td></tr>
+          <tr><td style="padding:8px 0;border-bottom:1px solid #d1fae5;color:#6b7280;font-size:13px;">Time</td>
+              <td style="padding:8px 0;border-bottom:1px solid #d1fae5;font-weight:700;color:#0f6e56;font-size:14px;">${slot_time}</td></tr>
+          <tr><td style="padding:8px 0;color:#6b7280;font-size:13px;">Mode</td>
+              <td style="padding:8px 0;color:#374151;font-size:14px;">${mode === 'video' ? '📹 Video consultation' : '🏥 In-person visit'}</td></tr>
+        </table>
+      </div>
+
+      ${mode === 'video' ? `
+      <!-- Video call button -->
+      <div style="text-align:center;margin-bottom:24px;">
+        <p style="color:#374151;font-size:14px;margin-bottom:16px;">At your appointment time, click below to join:</p>
+        <a href="${consultationLink}" 
+           style="display:inline-block;background:linear-gradient(135deg,#0f6e56,#1d9e75);color:#fff;text-decoration:none;padding:14px 32px;border-radius:50px;font-weight:700;font-size:15px;letter-spacing:0.3px;">
+          🎥 Join Video Consultation
+        </a>
+        <p style="color:#9ca3af;font-size:12px;margin-top:12px;">Or copy this link: <span style="color:#0f6e56;">${consultationLink}</span></p>
+      </div>
+      ` : ''}
+
+      <!-- Tips -->
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:16px;margin-bottom:24px;">
+        <p style="font-weight:700;color:#92400e;font-size:13px;margin:0 0 8px;">📋 Before your appointment</p>
+        <ul style="margin:0;padding-left:18px;color:#78350f;font-size:13px;line-height:1.8;">
+          <li>Keep your latest lab reports handy</li>
+          <li>Note down any symptoms or questions</li>
+          ${mode === 'video' ? '<li>Test your camera and microphone beforehand</li><li>Find a quiet, well-lit space</li>' : '<li>Carry your ID and insurance card</li>'}
+        </ul>
+      </div>
+
+      <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">
+        Need to reschedule? Contact us at <a href="mailto:info@VitalOS.App" style="color:#0f6e56;">info@VitalOS.App</a>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f0fdf8;padding:20px 32px;text-align:center;border-top:1px solid #d1fae5;">
+      <p style="color:#9ca3af;font-size:11px;margin:0;">
+        © 2026 VitalOS · Your Health Operating System · 
+        <a href="https://vitalos-six.vercel.app" style="color:#0f6e56;">vitalos-six.vercel.app</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>`
+
+    // Send via Resend
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
+      body: JSON.stringify({
+        from: 'VitalOS <info@VitalOS.App>',
+        to: [patient_email],
+        subject: `✅ Appointment confirmed — Dr. ${doctor_name} on ${dateStr}`,
+        html,
       })
-      const d=await r.json()
-      console.log(to,r.ok?'sent':'failed',JSON.stringify(d).slice(0,100))
-    }
-    await Promise.allSettled([
-      appt.profile?.email?mail(appt.profile.email,subj,body('patient')):null,
-      appt.doctor?.doctor_email&&appt.doctor?.notify_by_email!==false?mail(appt.doctor.doctor_email,subjDoc,body('doctor')):null,
-      mail(admin,subjAdmin,body('admin')),
-    ])
-    return new Response(JSON.stringify({ok:true,patient:appt.profile?.email,doctor:appt.doctor?.doctor_email,admin}),
-      {headers:{...corsHeaders,'Content-Type':'application/json'}})
-  }catch(e){
-    console.error(e)
-    return new Response(JSON.stringify({error:String(e)}),{status:500,headers:{...corsHeaders,'Content-Type':'application/json'}})
+    })
+
+    const result = await res.json()
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
 })
