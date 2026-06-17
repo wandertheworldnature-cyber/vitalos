@@ -1,8 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { supabase } from '@/lib/supabase'
-import { Video, Copy, Phone, Calendar, Check } from 'lucide-react'
+import { Video, Phone, Copy, Check, Calendar } from 'lucide-react'
 
 interface ApptInfo {
   doctor_name: string
@@ -11,23 +11,25 @@ interface ApptInfo {
   slot_time: string
 }
 
+// Daily.co domain from env — set VITE_DAILY_DOMAIN=vitalos in Vercel
+const DAILY_DOMAIN = import.meta.env.VITE_DAILY_DOMAIN || 'vitalos'
+
 export default function ConsultationRoom() {
   const { roomId } = useParams<{ roomId: string }>()
   const { user } = useAuthStore()
   const navigate = useNavigate()
+  const iframeRef = useRef<HTMLIFrameElement>(null)
   const [apptInfo, setApptInfo] = useState<ApptInfo | null>(null)
-  const [copied, setCopied] = useState<string | null>(null)
-  const [joined, setJoined] = useState(false)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [copied, setCopied] = useState(false)
+  const [showInfo, setShowInfo] = useState(false)
 
-  // Use meet.google.com/new style random room OR a fixed room per appointment
-  // Jitsi fix: use #config.prejoinPageEnabled=false&config.startWithVideoMuted=false
-  // The key insight: room names WITHOUT spaces/dashes don't trigger moderator gate
-  const cleanRoom = (roomId || '').replace(/[^a-zA-Z0-9]/g, '')
-  const jitsiUrl = `https://meet.jit.si/VitalOS${cleanRoom}#config.prejoinPageEnabled=false&config.requireDisplayName=false&config.lobby.enabled=false&config.enableWelcomePage=false&config.disableDeepLinking=true&userInfo.displayName=${encodeURIComponent(user?.full_name || 'Patient')}`
-  const doctorUrl = `https://meet.jit.si/VitalOS${cleanRoom}#config.prejoinPageEnabled=false&config.requireDisplayName=false&config.lobby.enabled=false&userInfo.displayName=Doctor`
+  // Clean room name — Daily.co room names must be alphanumeric + dashes only
+  const cleanRoom = `VitalOS-${(roomId || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)}`
+  const dailyUrl = `https://${DAILY_DOMAIN}.daily.co/${cleanRoom}`
   const shareUrl = `${window.location.origin}/consultation/${roomId}`
 
-  useEffect(() => { if (roomId) loadInfo() }, [roomId])
+  useEffect(() => { if (roomId) { loadInfo(); createRoom() } }, [roomId])
 
   async function loadInfo() {
     const { data } = await supabase.from('appointments')
@@ -36,28 +38,44 @@ export default function ConsultationRoom() {
       .maybeSingle()
     if (data) {
       const doc = data.doctor as unknown as { name: string; specialty: string }
-      setApptInfo({
-        doctor_name: doc?.name || 'Doctor',
-        doctor_specialty: doc?.specialty || '',
-        slot_date: data.slot_date,
-        slot_time: data.slot_time,
-      })
+      setApptInfo({ doctor_name: doc?.name || 'Doctor', doctor_specialty: doc?.specialty || '', slot_date: data.slot_date, slot_time: data.slot_time })
     }
   }
 
-  function openMeeting() {
-    window.open(jitsiUrl, '_blank', 'noopener,noreferrer')
-    setJoined(true)
+  async function createRoom() {
+    // Create room via Daily REST API — rooms persist so same link always works
+    try {
+      const apiKey = import.meta.env.VITE_DAILY_API_KEY
+      if (!apiKey) { setStatus('ready'); return } // no API key — use public room
+
+      // Try to create room (will fail silently if already exists)
+      await fetch('https://api.daily.co/v1/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          name: cleanRoom,
+          privacy: 'public', // anyone with link can join, no login needed
+          properties: {
+            enable_prejoin_ui: false,  // skip prejoin screen
+            enable_knocking: false,    // no knocking/lobby
+            start_video_off: false,
+            start_audio_off: false,
+            exp: Math.floor(Date.now() / 1000) + 86400 * 7, // expires in 7 days
+          }
+        })
+      })
+    } catch { /* ignore — room might already exist */ }
+    setStatus('ready')
   }
 
-  function copy(text: string, label: string) {
-    navigator.clipboard?.writeText(text)
-    setCopied(label)
-    setTimeout(() => setCopied(null), 2500)
+  function copy() {
+    navigator.clipboard?.writeText(dailyUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
   }
 
   function whatsapp() {
-    const msg = `Join my VitalOS video consultation 🎥\n\nClick this link to join:\n${doctorUrl}\n\nNo login or account needed — just click and join!`
+    const msg = `Join my VitalOS video consultation 🎥\n\nClick to join (no login needed):\n${dailyUrl}`
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
@@ -66,125 +84,96 @@ export default function ConsultationRoom() {
     : ''
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(160deg,#0a1a28 0%,#0f2a1e 100%)' }}>
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+    <div className="flex flex-col h-screen bg-gray-950">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800 shrink-0"
+        style={{ background: 'linear-gradient(135deg,#0f1a15,#0a2018)' }}>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
             style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)' }}>
-            <Video size={15} className="text-white" />
+            <Video size={14} className="text-white" />
           </div>
-          <div>
-            <p className="text-sm font-bold text-white leading-tight">VitalOS Consultation</p>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-white truncate">
+              {apptInfo ? `${apptInfo.doctor_name} · ${apptInfo.doctor_specialty}` : 'VitalOS Consultation'}
+            </p>
             <p className="text-[10px] text-emerald-400 flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse inline-block" />
-              Room {roomId}
+              {status === 'ready' ? 'Live' : 'Connecting...'} · {DAILY_DOMAIN}.daily.co
+              {apptInfo && <span className="text-gray-500 ml-1">· {dateStr} {apptInfo.slot_time?.slice(0,5)}</span>}
             </p>
           </div>
         </div>
-        <button onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-xs text-red-400 border border-red-800/50 px-3 py-1.5 rounded-lg hover:bg-red-900/20">
-          <Phone size={12} className="rotate-[135deg]" /> Leave
-        </button>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => setShowInfo(s => !s)}
+            className="text-xs text-gray-400 border border-gray-700 px-2.5 py-1.5 rounded-lg hover:bg-gray-800">
+            Share
+          </button>
+          <button onClick={() => navigate(-1)}
+            className="flex items-center gap-1 text-xs text-red-400 border border-red-900 px-2.5 py-1.5 rounded-lg hover:bg-red-900/20">
+            <Phone size={11} className="rotate-[135deg]" /> End
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-start px-4 py-6 gap-4 max-w-md mx-auto w-full">
+      {/* Share panel */}
+      {showInfo && (
+        <div className="shrink-0 border-b border-gray-800 px-4 py-3"
+          style={{ background: 'rgba(255,255,255,0.02)' }}>
+          <p className="text-[10px] text-gray-400 mb-2 font-bold">Send to doctor — they click and join instantly, no login needed:</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-[11px] text-teal-300 bg-gray-900 px-3 py-2 rounded-lg truncate">{dailyUrl}</code>
+            <button onClick={copy}
+              className="flex items-center gap-1 text-xs text-white bg-teal-700 px-3 py-2 rounded-lg whitespace-nowrap shrink-0">
+              {copied ? <><Check size={11}/>Copied!</> : <><Copy size={11}/>Copy</>}
+            </button>
+            <button onClick={whatsapp}
+              className="text-xs text-white bg-green-700 px-3 py-2 rounded-lg whitespace-nowrap shrink-0">
+              📲 WhatsApp
+            </button>
+          </div>
+        </div>
+      )}
 
-        {/* Doctor info card */}
-        {apptInfo && (
-          <div className="w-full rounded-2xl p-5"
-            style={{ background: 'rgba(15,110,86,0.15)', border: '1px solid rgba(29,158,117,0.3)' }}>
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white shrink-0"
-                style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)' }}>
-                {apptInfo.doctor_name.split(' ').slice(-1)[0].slice(0, 2)}
-              </div>
-              <div className="min-w-0">
-                <p className="text-base font-black text-white truncate">{apptInfo.doctor_name}</p>
-                <p className="text-sm text-emerald-400 font-medium">{apptInfo.doctor_specialty}</p>
-                <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                  <Calendar size={10} /> {dateStr} · {apptInfo.slot_time?.slice(0, 5)}
-                </p>
-              </div>
+      {/* Daily.co iframe — full screen, no moderator issue */}
+      <div className="flex-1 relative overflow-hidden">
+        {status === 'loading' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-950 z-10">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-2 border-t-emerald-500 border-gray-700 rounded-full animate-spin" />
+              <p className="text-xs text-gray-400">Starting video call...</p>
             </div>
           </div>
         )}
 
-        {/* Instructions */}
-        <div className="w-full rounded-xl p-4"
-          style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-          <p className="text-xs font-bold text-emerald-400 mb-2.5">How to start your video call</p>
-          {[
-            'Tap "Start video call" below — opens in new tab',
-            'You join instantly — no login, no waiting screen',
-            'Send doctor link via WhatsApp button below',
-            'Doctor clicks → joins the same room directly',
-          ].map((s, i) => (
-            <div key={i} className="flex items-start gap-2.5 mb-2">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5"
-                style={{ background: 'rgba(16,185,129,0.3)' }}>
-                {i + 1}
-              </span>
-              <p className="text-xs text-emerald-200 leading-relaxed">{s}</p>
-            </div>
-          ))}
-        </div>
+        <iframe
+          ref={iframeRef}
+          src={`${dailyUrl}?showLeaveButton=false&showFullscreenButton=true&userName=${encodeURIComponent(user?.full_name || 'Patient')}`}
+          allow="camera; microphone; fullscreen; speaker; display-capture"
+          style={{ width: '100%', height: '100%', border: 'none', background: '#000' }}
+          onLoad={() => setStatus('ready')}
+          onError={() => setStatus('error')}
+        />
 
-        {/* Big join button */}
-        <button onClick={openMeeting}
-          className="w-full py-4 rounded-2xl font-black text-lg text-white flex items-center justify-center gap-3 transition-all active:scale-95"
-          style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)', boxShadow: '0 8px 32px rgba(15,110,86,0.5)' }}>
-          <Video size={24} />
-          {joined ? 'Rejoin video call' : 'Start video call'}
-        </button>
-
-        {joined && (
-          <div className="w-full flex items-center gap-2 rounded-xl p-3"
-            style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
-            <Check size={14} className="text-emerald-400 shrink-0" />
-            <p className="text-xs text-emerald-300">Meeting opened. Now share the doctor link below.</p>
+        {status === 'error' && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950 gap-4 p-6 text-center">
+            <div className="text-4xl">📹</div>
+            <p className="text-white font-semibold">Unable to load video</p>
+            <p className="text-gray-400 text-sm">Open the meeting directly in your browser</p>
+            <a href={dailyUrl} target="_blank" rel="noreferrer"
+              className="px-6 py-3 rounded-xl text-white font-bold text-sm"
+              style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)' }}>
+              Open video call →
+            </a>
           </div>
         )}
+      </div>
 
-        {/* Share links */}
-        <div className="w-full space-y-3">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Send to doctor</p>
-
-          <div className="rounded-xl p-3"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <p className="text-[10px] text-gray-400 font-bold mb-2">🩺 Doctor link — no login needed</p>
-            <div className="flex items-start gap-2">
-              <code className="flex-1 text-[10px] text-teal-300 break-all leading-relaxed">
-                meet.jit.si/VitalOS{cleanRoom}
-              </code>
-              <div className="flex flex-col gap-1.5 shrink-0">
-                <button onClick={() => copy(doctorUrl, 'doctor')}
-                  className="flex items-center gap-1 text-[11px] text-white bg-teal-700 px-2.5 py-1.5 rounded-lg whitespace-nowrap">
-                  {copied === 'doctor' ? <><Check size={10} />Copied</> : <><Copy size={10} />Copy</>}
-                </button>
-                <button onClick={whatsapp}
-                  className="flex items-center justify-center gap-1 text-[11px] text-white bg-green-700 px-2.5 py-1.5 rounded-lg whitespace-nowrap">
-                  📲 WhatsApp
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl p-3"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <p className="text-[10px] text-gray-400 font-bold mb-2">🔗 VitalOS consultation link</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-[10px] text-blue-300 break-all">{shareUrl}</code>
-              <button onClick={() => copy(shareUrl, 'share')}
-                className="flex items-center gap-1 text-[11px] text-white bg-blue-700 px-2.5 py-1.5 rounded-lg whitespace-nowrap shrink-0">
-                {copied === 'share' ? <><Check size={10} />Copied</> : <><Copy size={10} />Copy</>}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <p className="text-[10px] text-gray-600 text-center pb-4">
-          Powered by Jitsi Meet · Free · End-to-end encrypted
+      {/* Footer */}
+      <div className="px-4 py-1.5 border-t border-gray-800 bg-gray-950 shrink-0">
+        <p className="text-[10px] text-gray-700 text-center">
+          Powered by Daily.co · 10,000 free mins/month · End-to-end encrypted · No login needed for doctor
         </p>
       </div>
     </div>
