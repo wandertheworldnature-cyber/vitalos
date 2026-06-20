@@ -3,6 +3,7 @@ import { useAuthStore } from '@/store/authStore'
 import { supabase } from '@/lib/supabase'
 import { Plus, Activity, Heart, Moon, Footprints, Dumbbell, Brain, Gauge, Wind, Leaf, Check, X } from 'lucide-react'
 import toast from 'react-hot-toast'
+import WearableBanner from '@/components/WearableBanner'
 
 type Category = 'vitals'|'fitness'|'mental'|'gut'|'manual'
 
@@ -253,25 +254,9 @@ export default function HealthDataPage() {
         </button>
       </div>
 
-      {/* Phase 2 — Wearable sync teaser */}
-      <div className="card !p-4 border-dashed border-2 border-gray-200">
-        <p className="text-xs font-bold text-gray-700 mb-2 flex items-center gap-2">
-          <Gauge size={14} className="text-gray-400"/> Wearable sync <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">COMING SOON</span>
-        </p>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            {name:'Apple Watch',  icon:'⌚', status:'Q3 2026'},
-            {name:'Google Fit',   icon:'📱', status:'Q3 2026'},
-            {name:'Samsung Health',icon:'⌚',status:'Q4 2026'},
-          ].map(w => (
-            <div key={w.name} className="bg-gray-50 rounded-lg p-2 text-center">
-              <p className="text-xl mb-1">{w.icon}</p>
-              <p className="text-[10px] font-semibold text-gray-600">{w.name}</p>
-              <p className="text-[9px] text-gray-400">{w.status}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Wearable sync  */}
+      
+      <WearableBanner />
 
       {/* Recent readings */}
       {recentRecords.length > 0 && (
