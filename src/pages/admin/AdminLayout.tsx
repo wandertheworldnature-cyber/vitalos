@@ -62,9 +62,7 @@ export default function AdminLayout() {
       <aside className="w-56 bg-gray-900 border-r border-gray-800 flex flex-col">
         <div className="p-4 border-b border-gray-800">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-teal-600 flex items-center justify-center">
-              <Heart size={13} className="text-white" />
-            </div>
+            <img src="/logo.jpeg" alt="VitalOS" className="w-9 h-9 rounded-xl object-cover shadow-sm"/>
             <div>
               <p className="text-sm font-semibold text-white">VitalOS</p>
               <p className="text-[10px] text-teal-400 flex items-center gap-1">

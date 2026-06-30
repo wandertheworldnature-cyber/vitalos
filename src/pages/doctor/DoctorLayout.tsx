@@ -62,10 +62,7 @@ export default function DoctorLayout() {
       <aside className="w-56 bg-gray-900 border-r border-gray-800 flex flex-col">
         <div className="p-4 border-b border-gray-800">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)' }}>
-              <Heart size={14} className="text-white" fill="white" />
-            </div>
+            <img src="/logo.jpeg" alt="VitalOS" className="w-9 h-9 rounded-xl object-cover shadow-sm"/>
             <div>
               <p className="text-xs font-bold text-white">VitalOS</p>
               <p className="text-[10px] text-teal-400">Doctor Panel</p>

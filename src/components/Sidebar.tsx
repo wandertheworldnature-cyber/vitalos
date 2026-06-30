@@ -1,10 +1,10 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Activity, Brain, TrendingUp, Stethoscope,
-  Users, FlaskConical, CreditCard, LogOut, Heart, Settings,
+  Users, FlaskConical, CreditCard, LogOut, Settings,
   UserCog, Zap, Clock, Flame, Dna, Wind, Leaf, User,
   Battery, Utensils, Moon, Cpu, Watch, FolderOpen, Shield,
-  GitBranch, Dumbbell, MessageSquare, FlaskRound
+  GitBranch, Dumbbell, MessageSquare, FlaskRound, Heart
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect, useState } from 'react'
@@ -97,13 +97,16 @@ export default function Sidebar() {
     <aside className="w-56 flex flex-col shrink-0 h-screen sticky top-0 overflow-y-auto"
       style={{ background: 'linear-gradient(180deg,#ffffff,#f0fdf8)', borderRight: '1px solid #d1fae5' }}>
 
-      {/* Logo */}
-      <div className="px-4 py-4 border-b border-emerald-100 shrink-0">
+      {/* Logo — clicks to dashboard */}
+      <div
+        className="px-4 py-4 border-b border-emerald-100 shrink-0 cursor-pointer hover:bg-emerald-50 transition-colors"
+        onClick={() => navigate('/dashboard')}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
-            style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)' }}>
-            <Heart size={16} className="text-white" fill="white" />
-          </div>
+          <img
+            src="/logo.jpeg"
+            alt="VitalOS"
+            className="w-9 h-9 rounded-xl shadow-sm object-cover"
+          />
           <div>
             <div className="text-sm font-bold text-gray-900">VitalOS</div>
             <div className="text-[10px] text-emerald-600">Health operating system</div>
@@ -127,7 +130,6 @@ export default function Sidebar() {
           </NavLink>
         ))}
 
-        {/* Advanced section */}
         <div className="px-4 pt-3 pb-1">
           <div className="flex items-center gap-2">
             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Advanced</span>
