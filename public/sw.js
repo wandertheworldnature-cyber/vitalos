@@ -1,53 +1,46 @@
-// VitalOS Service Worker — offline support + caching
-const CACHE = 'vitalos-v1'
-const STATIC = ['/','index.html','/manifest.json']
+const CACHE_NAME = 'vitalos-v1'
+const STATIC_ASSETS = [
+  '/',
+  '/dashboard',
+  '/logo.jpeg',
+  '/manifest.json',
+]
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)))
+// Install — cache static assets
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
+  )
   self.skipWaiting()
 })
 
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-  ))
+// Activate — clean old caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
+  )
   self.clients.claim()
 })
 
-self.addEventListener('fetch', e => {
-  // Network first for API calls
-  if (e.request.url.includes('supabase') || e.request.url.includes('groq') || e.request.url.includes('gemini')) {
-    e.respondWith(fetch(e.request).catch(() => new Response('{"error":"offline"}', { headers: { 'Content-Type': 'application/json' } })))
-    return
-  }
-  // Cache first for static assets
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached
-      return fetch(e.request).then(res => {
-        if (res.ok && e.request.method === 'GET') {
-          const clone = res.clone()
-          caches.open(CACHE).then(c => c.put(e.request, clone))
+// Fetch — network first, fallback to cache
+self.addEventListener('fetch', (event) => {
+  // Skip non-GET and chrome-extension requests
+  if (event.request.method !== 'GET') return
+  if (event.request.url.startsWith('chrome-extension')) return
+  if (event.request.url.includes('supabase') || event.request.url.includes('groq') || event.request.url.includes('resend')) return
+
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        // Cache successful responses
+        if (response && response.status === 200) {
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone))
         }
-        return res
-      }).catch(() => caches.match('/') || new Response('Offline'))
-    })
+        return response
+      })
+      .catch(() => caches.match(event.request))
   )
-})
-
-// Push notifications support
-self.addEventListener('push', e => {
-  const data = e.data?.json() || {}
-  self.registration.showNotification(data.title || 'VitalOS', {
-    body: data.body || 'Health update',
-    icon: '/icon-192.png',
-    badge: '/icon-72.png',
-    data: { url: data.url || '/dashboard' },
-    vibrate: [100, 50, 100],
-  })
-})
-
-self.addEventListener('notificationclick', e => {
-  e.notification.close()
-  e.waitUntil(clients.openWindow(e.notification.data?.url || '/dashboard'))
 })
