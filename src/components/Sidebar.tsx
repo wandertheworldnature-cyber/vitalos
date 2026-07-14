@@ -1,10 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Activity, Brain, TrendingUp, Stethoscope,
-  Users, FlaskConical, CreditCard, LogOut, Settings,
-  UserCog, Zap, Clock, Flame, Dna, Wind, Leaf, User,
-  Battery, Utensils, Moon, Cpu, Watch, FolderOpen, Shield,
-  GitBranch, Dumbbell, MessageSquare, FlaskRound, Heart
+  Users, FlaskConical, CreditCard, LogOut, Settings, UserCog,
+  Zap, Clock, Flame, Dna, Wind, Leaf, User, Battery, Utensils,
+  Moon, Cpu, Watch, FolderOpen, Shield, GitBranch, Dumbbell,
+  MessageSquare, FlaskRound, Home, Trophy, Building2, Search,
+  Wifi, Sparkles, Heart
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect, useState } from 'react'
@@ -12,25 +13,32 @@ import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
 const NAV_MAIN = [
-  { to:'/dashboard',     icon:LayoutDashboard, label:'Dashboard'        },
-  { to:'/ai-copilot',    icon:MessageSquare,   label:'AI Copilot',      badge:'NEW', badgeColor:'#0f6e56' },
-  { to:'/longevity',     icon:Zap,             label:'Longevity Score', badge:'CORE',badgeColor:'#f59e0b' },
-  { to:'/habits',        icon:Flame,           label:'Daily Habits'     },
-  { to:'/timeline',      icon:Clock,           label:'Health Timeline'  },
-  { to:'/health-data',   icon:Activity,        label:'Health data'      },
-  { to:'/insights',      icon:Brain,           label:'AI insights'      },
-  { to:'/trends',        icon:TrendingUp,      label:'Trends'           },
-  { to:'/biomarkers',    icon:FlaskRound,      label:'Biomarkers',      badge:'NEW', badgeColor:'#10b981' },
-  { to:'/correlations',  icon:GitBranch,       label:'Correlations',    badge:'NEW', badgeColor:'#06b6d4' },
-  { to:'/mental-health', icon:Brain,           label:'Mental Health',   badge:'NEW', badgeColor:'#8b5cf6' },
-  { to:'/fitness',       icon:Dumbbell,        label:'Fitness',         badge:'NEW', badgeColor:'#7c3aed' },
-  { to:'/wearables',     icon:Watch,           label:'Wearables',       badge:'NEW', badgeColor:'#3b82f6' },
-  { to:'/health-records',icon:FolderOpen,      label:'Health Records',  badge:'NEW', badgeColor:'#6366f1' },
-  { to:'/emergency-card',icon:Shield,          label:'Emergency Card',  badge:'NEW', badgeColor:'#ef4444' },
-  { to:'/doctors',       icon:Stethoscope,     label:'Doctors'          },
-  { to:'/family',        icon:Users,           label:'Family'           },
-  { to:'/reports',       icon:FlaskConical,    label:'Reports'          },
-  { to:'/subscription',  icon:CreditCard,      label:'Subscription'     },
+  { to:'/dashboard',        icon:LayoutDashboard, label:'Dashboard'         },
+  { to:'/ai-copilot',       icon:MessageSquare,   label:'AI Copilot',       badge:'NEW', badgeColor:'#0f6e56' },
+  { to:'/longevity-coach',  icon:Sparkles,        label:'Longevity Coach',  badge:'NEW', badgeColor:'#10b981' },
+  { to:'/longevity',        icon:Zap,             label:'Longevity Score',  badge:'CORE',badgeColor:'#f59e0b' },
+  { to:'/habits',           icon:Flame,           label:'Daily Habits'      },
+  { to:'/timeline',         icon:Clock,           label:'Health Timeline'   },
+  { to:'/health-data',      icon:Activity,        label:'Health data'       },
+  { to:'/insights',         icon:Brain,           label:'AI insights'       },
+  { to:'/trends',           icon:TrendingUp,      label:'Trends'            },
+  { to:'/biomarkers',       icon:FlaskRound,      label:'Biomarkers',       badge:'NEW', badgeColor:'#10b981' },
+  { to:'/correlations',     icon:GitBranch,       label:'Correlations',     badge:'NEW', badgeColor:'#06b6d4' },
+  { to:'/ai-health-search', icon:Search,          label:'AI Health Search', badge:'NEW', badgeColor:'#f59e0b' },
+  { to:'/mental-health',    icon:Brain,           label:'Mental Health',    badge:'NEW', badgeColor:'#8b5cf6' },
+  { to:'/fitness',          icon:Dumbbell,        label:'Fitness',          badge:'NEW', badgeColor:'#7c3aed' },
+  { to:'/behavior-engine',  icon:Trophy,          label:'Challenges',       badge:'NEW', badgeColor:'#f97316' },
+  { to:'/wearables',        icon:Watch,           label:'Wearables',        badge:'NEW', badgeColor:'#3b82f6' },
+  { to:'/iot-devices',      icon:Wifi,            label:'IoT Devices',      badge:'NEW', badgeColor:'#10b981' },
+  { to:'/health-records',   icon:FolderOpen,      label:'Health Records',   badge:'NEW', badgeColor:'#6366f1' },
+  { to:'/emergency-card',   icon:Shield,          label:'Emergency Card',   badge:'NEW', badgeColor:'#ef4444' },
+  { to:'/home-healthcare',  icon:Home,            label:'Home Healthcare',  badge:'NEW', badgeColor:'#3b82f6' },
+  { to:'/corporate-wellness',icon:Building2,      label:'Corporate',        badge:'B2B', badgeColor:'#0ea5e9' },
+  { to:'/clinical-decision', icon:Stethoscope,   label:'Clinical AI',      badge:'NEW', badgeColor:'#6366f1' },
+  { to:'/doctors',          icon:Stethoscope,     label:'Doctors'           },
+  { to:'/family',           icon:Users,           label:'Family'            },
+  { to:'/reports',          icon:FlaskConical,    label:'Reports'           },
+  { to:'/subscription',     icon:CreditCard,      label:'Subscription'      },
 ]
 
 const NAV_ADV = [
@@ -75,38 +83,27 @@ export default function Sidebar() {
   async function loadAlerts() {
     if (!user?.id) return
     const { count } = await supabase.from('ai_insights')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id).in('severity', ['critical', 'warning'])
-      .gte('generated_at', new Date(Date.now() - 7 * 86400000).toISOString())
+      .select('id', { count:'exact', head:true })
+      .eq('user_id', user.id).in('severity', ['critical','warning'])
+      .gte('generated_at', new Date(Date.now() - 7*86400000).toISOString())
     setAlerts(count || 0)
   }
 
   const handleSignOut = async () => { await signOut(); toast.success('Signed out'); navigate('/login') }
-
   const initials = user?.full_name
-    ? user.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-    : (user?.email || 'U').slice(0, 2).toUpperCase()
-
-  const planBadge: Record<string, string> = {
-    basic: 'bg-gray-100 text-gray-600',
-    pro: 'bg-blue-100 text-blue-700',
-    premium: 'bg-amber-100 text-amber-700',
-  }
+    ? user.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
+    : (user?.email||'U').slice(0,2).toUpperCase()
+  const planBadge: Record<string,string> = { basic:'bg-gray-100 text-gray-600', pro:'bg-blue-100 text-blue-700', premium:'bg-amber-100 text-amber-700' }
 
   return (
     <aside className="w-56 flex flex-col shrink-0 h-screen sticky top-0 overflow-y-auto"
-      style={{ background: 'linear-gradient(180deg,#ffffff,#f0fdf8)', borderRight: '1px solid #d1fae5' }}>
+      style={{ background:'linear-gradient(180deg,#ffffff,#f0fdf8)', borderRight:'1px solid #d1fae5' }}>
 
-      {/* Logo — clicks to dashboard */}
-      <div
-        className="px-4 py-4 border-b border-emerald-100 shrink-0 cursor-pointer hover:bg-emerald-50 transition-colors"
+      {/* Logo — click to go home */}
+      <div className="px-4 py-4 border-b border-emerald-100 shrink-0 cursor-pointer hover:bg-emerald-50 transition-colors"
         onClick={() => navigate('/dashboard')}>
         <div className="flex items-center gap-3">
-          <img
-            src="/logo.jpeg"
-            alt="VitalOS"
-            className="w-9 h-9 rounded-xl shadow-sm object-cover"
-          />
+          <img src="/logo.jpeg" alt="VitalOS" className="w-9 h-9 rounded-xl shadow-sm object-cover"/>
           <div>
             <div className="text-sm font-bold text-gray-900">VitalOS</div>
             <div className="text-[10px] text-emerald-600">Health operating system</div>
@@ -114,19 +111,13 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Main nav */}
       <nav className="flex-1 py-2 space-y-0.5">
-        {NAV_MAIN.map(({ to, icon: Icon, label, badge, badgeColor }) => (
-          <NavLink key={to} to={to} className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}>
-            <Icon size={15} />
+        {NAV_MAIN.map(({ to, icon:Icon, label, badge, badgeColor }) => (
+          <NavLink key={to} to={to} className={({ isActive }) => `sidebar-item ${isActive?'active':''}`}>
+            <Icon size={15}/>
             <span className="flex-1 text-sm">{label}</span>
-            {badge && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold text-white shrink-0"
-                style={{ background: badgeColor }}>{badge}</span>
-            )}
-            {to === '/insights' && alerts > 0 && (
-              <span className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-[9px] text-white font-bold shrink-0">{alerts}</span>
-            )}
+            {badge && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold text-white shrink-0" style={{ background:badgeColor }}>{badge}</span>}
+            {to==='/insights' && alerts>0 && <span className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-[9px] text-white font-bold shrink-0">{alerts}</span>}
           </NavLink>
         ))}
 
@@ -137,52 +128,48 @@ export default function Sidebar() {
           </div>
         </div>
 
-        {NAV_ADV.map(({ to, icon: Icon, label, color, badge }) => (
-          <NavLink key={to} to={to} className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}>
-            <Icon size={15} style={{ color }} />
+        {NAV_ADV.map(({ to, icon:Icon, label, color, badge }) => (
+          <NavLink key={to} to={to} className={({ isActive }) => `sidebar-item ${isActive?'active':''}`}>
+            <Icon size={15} style={{ color }}/>
             <span className="flex-1 text-sm">{label}</span>
             {badge
-              ? <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold shrink-0" style={{ background: `${color}20`, color }}>{badge}</span>
+              ? <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold shrink-0" style={{ background:`${color}20`, color }}>{badge}</span>
               : (!isPremium && <span className="text-[9px] text-gray-400 shrink-0">🔒</span>)
             }
           </NavLink>
         ))}
       </nav>
 
-      {/* Daily tip */}
       <div className="mx-3 mb-2 p-3 rounded-xl border border-emerald-100 shrink-0"
-        style={{ background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)' }}>
+        style={{ background:'linear-gradient(135deg,#ecfdf5,#d1fae5)' }}>
         <p className="text-[10px] font-bold text-emerald-800 mb-1">💡 Daily tip</p>
         <p className="text-[10px] text-emerald-700 leading-relaxed">{tip}</p>
       </div>
 
-      {/* User footer */}
       <div className="p-3 border-t border-emerald-100 shrink-0 space-y-2">
-        <button onClick={() => navigate('/profile')}
+        <button onClick={()=>navigate('/profile')}
           className="flex items-center gap-2.5 w-full hover:bg-gray-50 rounded-xl p-1.5 transition-colors">
           <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-            style={{ background: 'linear-gradient(135deg,#0f6e56,#1d9e75)' }}>{initials}</div>
+            style={{ background:'linear-gradient(135deg,#0f6e56,#1d9e75)' }}>{initials}</div>
           <div className="min-w-0 text-left flex-1">
-            <div className="text-xs font-semibold text-gray-900 truncate">{user?.full_name || user?.email?.split('@')[0] || 'User'}</div>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold capitalize ${planBadge[user?.plan || 'basic']}`}>{user?.plan || 'basic'} plan</span>
+            <div className="text-xs font-semibold text-gray-900 truncate">{user?.full_name||user?.email?.split('@')[0]||'User'}</div>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold capitalize ${planBadge[user?.plan||'basic']}`}>{user?.plan||'basic'} plan</span>
           </div>
-          <User size={12} className="text-gray-300 shrink-0" />
+          <User size={12} className="text-gray-300 shrink-0"/>
         </button>
-
         <div className="flex gap-1.5 flex-wrap">
-          <button onClick={() => navigate(isDoctor ? '/doctor' : '/doctor/login')}
+          <button onClick={()=>navigate(isDoctor?'/doctor':'/doctor/login')}
             className="flex items-center gap-1 text-[11px] font-semibold py-1.5 px-2.5 rounded-lg transition-colors"
-            style={isDoctor ? { background: '#ecfdf5', color: '#0f6e56', border: '1px solid #a7f3d0' } : { background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
-            {isDoctor ? <UserCog size={11} /> : <Stethoscope size={11} />}
-            {isDoctor ? 'Doctor panel' : 'Doctor login'}
+            style={isDoctor?{background:'#ecfdf5',color:'#0f6e56',border:'1px solid #a7f3d0'}:{background:'#eff6ff',color:'#2563eb',border:'1px solid #bfdbfe'}}>
+            {isDoctor?<UserCog size={11}/>:<Stethoscope size={11}/>}{isDoctor?'Doctor panel':'Doctor login'}
           </button>
-          <button onClick={() => navigate('/admin')}
+          <button onClick={()=>navigate('/admin')}
             className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-gray-800 py-1.5 px-2 rounded-lg hover:bg-gray-100 transition-colors">
-            <Settings size={11} /> Admin
+            <Settings size={11}/> Admin
           </button>
           <button onClick={handleSignOut}
             className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-red-500 py-1.5 px-2 rounded-lg hover:bg-red-50 transition-colors ml-auto">
-            <LogOut size={11} /> Out
+            <LogOut size={11}/> Out
           </button>
         </div>
       </div>
