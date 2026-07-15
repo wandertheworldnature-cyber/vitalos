@@ -30,7 +30,7 @@ export const useAuthStore = create<AuthStore>()(
         try {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('id, full_name, email, plan, role')
+            .select('id, full_name, email, plan')
             .eq('id', id)
             .single()
 
