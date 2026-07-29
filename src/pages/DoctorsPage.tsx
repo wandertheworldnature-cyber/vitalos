@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
+
 const SPECIALTIES = ['All','Preventive Medicine','General Physician','Cardiologist',
   'Endocrinologist','Internal Medicine','Neurologist','Dermatologist',
   'Gynecologist & Obstetrician','Psychiatrist','Nutritionist & Dietitian']

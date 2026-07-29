@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Gift } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useSearchParams } from 'react-router-dom'
 
 export default function AuthPage() {
   const navigate = useNavigate()
@@ -48,7 +47,6 @@ export default function AuthPage() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim().toLowerCase(), password,
           options: { data: { full_name: name.trim() } }
-           
         })
         if (error) { toast.error(error.message); setLoading(false); return }
         if (data.user) {
@@ -77,11 +75,10 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex" style={{ background: '#f0fdf8' }}>
-      {/* Left — branding */}
+      {/* Left — branding (desktop only) */}
       <div className="hidden md:flex flex-1 flex-col justify-between p-12"
         style={{ background: 'linear-gradient(135deg,#0f6e56 0%,#0a5a46 60%,#063d2f 100%)' }}>
         <div className="flex items-center gap-3">
-          {/* Logo image */}
           <img src="/logo.jpeg" alt="VitalOS" className="w-11 h-11 rounded-xl shadow-lg object-cover" />
           <span className="text-xl font-bold text-white">VitalOS</span>
         </div>
@@ -92,11 +89,6 @@ export default function AuthPage() {
           <p className="text-emerald-200 text-lg mb-8">
             Detect diseases before they start. AI-powered insights, longevity tracking, and preventive care — built for India.
           </p>
-          {refCode && (
-  <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 mb-4 text-center">
-    <p className="text-xs text-purple-700">🎁 You were invited! Sign up to get bonus points.</p>
-  </div>
-)}
           <div className="space-y-3">
             {[
               'AI analysis of lab reports in seconds',
@@ -119,14 +111,24 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Right — form */}
+      {/* Right — form (always visible, mobile + desktop) */}
       <div className="flex-1 flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-8 md:hidden">
+          <div className="flex items-center gap-2 mb-6 md:hidden">
             <img src="/logo.jpeg" alt="VitalOS" className="w-10 h-10 rounded-xl object-cover shadow" />
             <span className="text-lg font-bold text-gray-900">VitalOS</span>
           </div>
+
+          {/* Referral banner — visible on ALL screen sizes, placed right above the form */}
+          {refCode && !isLogin && (
+            <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 mb-5 flex items-center gap-2.5">
+              <Gift size={18} className="text-purple-500 shrink-0" />
+              <p className="text-xs text-purple-700">
+                <span className="font-bold">You were invited!</span> Sign up now to get bonus points for you and your friend.
+              </p>
+            </div>
+          )}
 
           <h2 className="text-2xl font-black text-gray-900 mb-1">
             {isLogin ? 'Welcome back' : 'Create account'}
