@@ -5,12 +5,13 @@ import {
   Zap, Clock, Flame, Dna, Wind, Leaf, User, Battery, Utensils,
   Moon, Cpu, Watch, FolderOpen, Shield, GitBranch, Dumbbell,
   MessageSquare, FlaskRound, Home, Trophy, Building2, Search,
-  Wifi, Sparkles, Heart
+  Wifi, Sparkles, Heart, Gift, ShieldCheck
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
+
 
 const NAV_MAIN = [
   { to:'/dashboard',        icon:LayoutDashboard, label:'Dashboard'         },
@@ -39,6 +40,9 @@ const NAV_MAIN = [
   { to:'/family',           icon:Users,           label:'Family'            },
   { to:'/reports',          icon:FlaskConical,    label:'Reports'           },
   { to:'/subscription',     icon:CreditCard,      label:'Subscription'      },
+  { to:'/referral',         icon:Gift,        label:'Invite & Earn',   badge:'NEW', badgeColor:'#a855f7' },
+  { to:'/family-dashboard', icon:Users,       label:'Family Care',     badge:'NEW', badgeColor:'#10b981' },
+  { to:'/privacy',          icon:ShieldCheck, label:'Privacy Center',  badge:'NEW', badgeColor:'#3b82f6' },
 ]
 
 const NAV_ADV = [

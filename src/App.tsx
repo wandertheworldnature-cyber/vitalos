@@ -61,6 +61,9 @@ import DoctorOverview from '@/pages/doctor/DoctorOverview'
 import DoctorAppointments from '@/pages/doctor/DoctorAppointments'
 import DoctorPatients from '@/pages/doctor/DoctorPatients'
 import DoctorConsultations from '@/pages/doctor/DoctorConsultations'
+import ReferralProgram from '@/pages/referral/ReferralProgram'
+import FamilyDashboard from '@/pages/family/FamilyDashboard'
+import PrivacyCenter from '@/pages/privacy/PrivacyCenter'
 
 export default function App() {
   const { fetchProfile, setUser } = useAuthStore()
@@ -123,6 +126,9 @@ export default function App() {
           <Route path="/intelligence/sleep"           element={<SleepIntelligencePage/>}/>
           <Route path="/intelligence/memory"          element={<HealthMemoryPage/>}/>
           <Route path="/intelligence/digital-twin"    element={<DigitalTwinPage/>}/>
+          <Route path="/referral" element={<ReferralProgram/>}/>
+          <Route path="/family-dashboard" element={<FamilyDashboard/>}/>
+          <Route path="/privacy" element={<PrivacyCenter/>}/>
         </Route>
 
         <Route path="/admin" element={<AdminLayout/>}>

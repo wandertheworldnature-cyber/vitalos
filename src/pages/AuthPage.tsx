@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
 import { Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useSearchParams } from 'react-router-dom'
 
 export default function AuthPage() {
   const navigate = useNavigate()
@@ -14,6 +15,8 @@ export default function AuthPage() {
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPass, setShowPass] = useState(false)
+  const [searchParams] = useSearchParams()
+  const refCode = searchParams.get('ref')
 
   useEffect(() => {
     if (user) navigate('/dashboard', { replace: true })
@@ -45,12 +48,14 @@ export default function AuthPage() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim().toLowerCase(), password,
           options: { data: { full_name: name.trim() } }
+           
         })
         if (error) { toast.error(error.message); setLoading(false); return }
         if (data.user) {
           await supabase.from('profiles').upsert({
             id: data.user.id, email: email.trim().toLowerCase(),
             full_name: name.trim(), plan: 'basic',
+            referred_by: refCode || null,
           })
           if (data.session) {
             await fetchProfile(data.user.id)
@@ -87,6 +92,11 @@ export default function AuthPage() {
           <p className="text-emerald-200 text-lg mb-8">
             Detect diseases before they start. AI-powered insights, longevity tracking, and preventive care — built for India.
           </p>
+          {refCode && (
+  <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 mb-4 text-center">
+    <p className="text-xs text-purple-700">🎁 You were invited! Sign up to get bonus points.</p>
+  </div>
+)}
           <div className="space-y-3">
             {[
               'AI analysis of lab reports in seconds',
