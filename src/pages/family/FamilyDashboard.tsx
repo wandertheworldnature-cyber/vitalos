@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { supabase } from '@/lib/supabase'
-import { Users, Plus, Shield, Heart, AlertTriangle, ChevronRight, UserPlus, Bell, Activity, Check, X } from 'lucide-react'
+import { Users, Shield, UserPlus, Bell, Activity, Check, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface FamilyMember {
@@ -9,12 +9,10 @@ interface FamilyMember {
   name: string
   relation: string
   age: number | null
-  avatar_color: string
+  gender: string | null
+  avatar_color: string | null
   health_score: number | null
-  last_active: string | null
-  alerts: number
   is_elderly: boolean
-  emergency_profile: { blood_group?: string; allergies?: string[]; conditions?: string[] } | null
 }
 
 const RELATIONS = ['Spouse', 'Father', 'Mother', 'Son', 'Daughter', 'Sibling', 'Grandparent', 'Other']
@@ -25,8 +23,7 @@ export default function FamilyDashboard() {
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
-  const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null)
-  const [form, setForm] = useState({ name: '', relation: 'Father', age: '', is_elderly: false, email: '' })
+  const [form, setForm] = useState({ name: '', relation: 'Father', age: '', gender: '', is_elderly: false, email: '' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { if (user) load() }, [user])
@@ -34,15 +31,15 @@ export default function FamilyDashboard() {
   async function load() {
     if (!user) return
     setLoading(true)
-    const { data } = await supabase.from('family_members')
-      .select('*').eq('owner_id', user.id).order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('family_members')
+      .select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+    if (error) console.error('Family load error:', error)
     setMembers((data || []).map((m: Record<string,unknown>, i: number) => ({
       id: m.id as string, name: m.name as string, relation: m.relation as string,
-      age: m.age as number | null, avatar_color: COLORS[i % COLORS.length],
-      health_score: (m.health_score as number) || null,
-      last_active: m.updated_at as string | null,
-      alerts: 0, is_elderly: (m.is_elderly as boolean) || false,
-      emergency_profile: m.emergency_profile as FamilyMember['emergency_profile'],
+      age: m.age as number | null, gender: m.gender as string | null,
+      avatar_color: (m.avatar_color as string) || COLORS[i % COLORS.length],
+      health_score: m.health_score as number | null,
+      is_elderly: (m.is_elderly as boolean) || false,
     })))
     setLoading(false)
   }
@@ -51,16 +48,22 @@ export default function FamilyDashboard() {
     if (!user || !form.name.trim()) { toast.error('Enter a name'); return }
     setSaving(true)
     try {
-      await supabase.from('family_members').insert({
-        owner_id: user.id, name: form.name.trim(), relation: form.relation,
-        age: form.age ? parseInt(form.age) : null, is_elderly: form.is_elderly,
+      const { error } = await supabase.from('family_members').insert({
+        user_id: user.id, name: form.name.trim(), relation: form.relation,
+        age: form.age ? parseInt(form.age) : null,
+        gender: form.gender || null,
+        avatar_color: COLORS[members.length % COLORS.length],
+        is_elderly: form.is_elderly,
         linked_email: form.email || null,
       })
+      if (error) throw error
       toast.success(`${form.name} added to your family!`)
-      setForm({ name: '', relation: 'Father', age: '', is_elderly: false, email: '' })
+      setForm({ name: '', relation: 'Father', age: '', gender: '', is_elderly: false, email: '' })
       setShowAdd(false); load()
-    } catch { toast.error('Failed to add member — check family_members table exists') }
-    finally { setSaving(false) }
+    } catch (e) {
+      console.error(e)
+      toast.error('Failed to add member')
+    } finally { setSaving(false) }
   }
 
   async function removeMember(id: string, name: string) {
@@ -89,7 +92,7 @@ export default function FamilyDashboard() {
           </div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2">
-          {[['Members', members.length], ['Elderly care', elderlyMembers.length], ['Active alerts', members.reduce((a,m)=>a+m.alerts,0)]].map(([l,v])=>(
+          {[['Members', members.length], ['Elderly care', elderlyMembers.length], ['Active alerts', 0]].map(([l,v])=>(
             <div key={String(l)} className="bg-white/10 rounded-lg p-2 text-center">
               <div className="text-lg font-black text-white">{v}</div>
               <div className="text-[9px] text-green-300">{l}</div>
@@ -98,7 +101,6 @@ export default function FamilyDashboard() {
         </div>
       </div>
 
-      {/* Elderly care alert banner */}
       {elderlyMembers.length > 0 && (
         <div className="card !p-4 bg-amber-50 border-amber-100">
           <p className="text-xs font-bold text-amber-700 mb-2 flex items-center gap-1.5"><Bell size={12}/>Elderly care monitoring active</p>
@@ -106,13 +108,11 @@ export default function FamilyDashboard() {
         </div>
       )}
 
-      {/* Add member button */}
       <button onClick={() => setShowAdd(true)}
         className="w-full py-3 rounded-xl border-2 border-dashed border-gray-200 text-gray-500 text-sm font-semibold flex items-center justify-center gap-2 hover:border-teal-300 hover:text-teal-600 transition-colors">
         <UserPlus size={16} /> Add family member
       </button>
 
-      {/* Add member form */}
       {showAdd && (
         <div className="card !p-5 space-y-3">
           <div className="flex items-center justify-between">
@@ -120,11 +120,17 @@ export default function FamilyDashboard() {
             <button onClick={() => setShowAdd(false)}><X size={16} className="text-gray-400" /></button>
           </div>
           <input className="input text-sm" placeholder="Full name" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <select className="input text-sm" value={form.relation} onChange={e => setForm(p => ({ ...p, relation: e.target.value }))}>
               {RELATIONS.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
             <input type="number" className="input text-sm" placeholder="Age" value={form.age} onChange={e => setForm(p => ({ ...p, age: e.target.value }))} />
+            <select className="input text-sm" value={form.gender} onChange={e => setForm(p => ({ ...p, gender: e.target.value }))}>
+              <option value="">Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
           </div>
           <input type="email" className="input text-sm" placeholder="Their email (optional — for shared access)" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
           <label className="flex items-center gap-2 text-sm text-gray-600">
@@ -137,7 +143,6 @@ export default function FamilyDashboard() {
         </div>
       )}
 
-      {/* Family members list */}
       {loading ? (
         <div className="space-y-2">{[1,2].map(i => <div key={i} className="card h-20 animate-pulse bg-gray-50" />)}</div>
       ) : members.length === 0 ? (
@@ -151,7 +156,7 @@ export default function FamilyDashboard() {
           {members.map(m => (
             <div key={m.id} className="card !p-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-base font-bold shrink-0" style={{ background: m.avatar_color }}>
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-base font-bold shrink-0" style={{ background: m.avatar_color || '#0f6e56' }}>
                   {m.name[0]}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -186,7 +191,6 @@ export default function FamilyDashboard() {
         </div>
       )}
 
-      {/* Info card */}
       <div className="card !p-4 bg-blue-50 border-blue-100">
         <p className="text-xs font-bold text-blue-700 mb-1">💡 About family tracking</p>
         <p className="text-xs text-blue-600 leading-relaxed">
