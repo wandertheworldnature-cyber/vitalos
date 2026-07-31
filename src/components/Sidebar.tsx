@@ -5,7 +5,7 @@ import {
   Zap, Clock, Flame, Dna, Wind, Leaf, User, Battery, Utensils,
   Moon, Cpu, Watch, FolderOpen, Shield, GitBranch, Dumbbell,
   MessageSquare, FlaskRound, Home, Trophy, Building2, Search,
-  Wifi, Sparkles, Heart, Gift, ShieldCheck
+  Wifi, Sparkles, Heart, Gift, ShieldCheck, BookOpen, Bell
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect, useState } from 'react'
@@ -43,6 +43,9 @@ const NAV_MAIN = [
   { to:'/referral',         icon:Gift,        label:'Invite & Earn',   badge:'NEW', badgeColor:'#a855f7' },
   { to:'/family-dashboard', icon:Users,       label:'Family Care',     badge:'NEW', badgeColor:'#10b981' },
   { to:'/privacy',          icon:ShieldCheck, label:'Privacy Center',  badge:'NEW', badgeColor:'#3b82f6' },
+  { to:'/insurance',              icon:Shield,    label:'Insurance',      badge:'NEW', badgeColor:'#0ea5e9' },
+  { to:'/health-blog',            icon:BookOpen,  label:'Health Library', badge:'NEW', badgeColor:'#10b981' },
+  { to:'/notification-settings',  icon:Bell,      label:'Notifications',  badge:'NEW', badgeColor:'#8b5cf6' },
 ]
 
 const NAV_ADV = [

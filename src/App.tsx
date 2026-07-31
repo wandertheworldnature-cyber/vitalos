@@ -64,6 +64,9 @@ import DoctorConsultations from '@/pages/doctor/DoctorConsultations'
 import ReferralProgram from '@/pages/referral/ReferralProgram'
 import FamilyDashboard from '@/pages/family/FamilyDashboard'
 import PrivacyCenter from '@/pages/privacy/PrivacyCenter'
+import InsuranceHub from '@/pages/insurance/InsuranceHub'
+import HealthBlog from '@/pages/blog/HealthBlog'
+import NotificationSettings from '@/pages/settings/NotificationSettings'
 
 export default function App() {
   const { fetchProfile, setUser } = useAuthStore()
@@ -129,6 +132,9 @@ export default function App() {
           <Route path="/referral" element={<ReferralProgram/>}/>
           <Route path="/family-dashboard" element={<FamilyDashboard/>}/>
           <Route path="/privacy" element={<PrivacyCenter/>}/>
+          <Route path="/insurance" element={<InsuranceHub/>}/>
+          <Route path="/health-blog" element={<HealthBlog/>}/>
+          <Route path="/notification-settings" element={<NotificationSettings/>}/>
         </Route>
 
         <Route path="/admin" element={<AdminLayout/>}>

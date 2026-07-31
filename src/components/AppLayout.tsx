@@ -4,6 +4,7 @@ import Sidebar from './Sidebar'
 import AIChat from './AIChat'
 import { LayoutDashboard, Zap, Stethoscope, Brain, Menu, Flame } from 'lucide-react'
 
+
 const BOTTOM_NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Home'    },
   { to: '/longevity',  icon: Zap,            label: 'Score'   },
