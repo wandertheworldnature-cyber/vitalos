@@ -286,3 +286,4 @@ export async function addFamilyMember(member: Omit<FamilyMember, 'id' | 'created
   if (error) throw error
   return data as FamilyMember
 }
+

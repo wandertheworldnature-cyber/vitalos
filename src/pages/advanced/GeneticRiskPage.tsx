@@ -40,7 +40,7 @@ async function analyzeGeneticReport(text: string, userAge?: number): Promise<Gen
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       messages: [{
         role: 'system',
         content: `You are VitalOS Genetic AI — an expert at analyzing genetic/DNA health reports.
@@ -313,3 +313,4 @@ export default function GeneticRiskPage() {
     </div>
   )
 }
+

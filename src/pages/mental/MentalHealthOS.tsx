@@ -136,7 +136,7 @@ export default function MentalHealthOS() {
         method:'POST',
         headers:{'Content-Type':'application/json', Authorization:`Bearer ${key}`},
         body: JSON.stringify({
-          model:'llama-3.3-70b-versatile',
+          model:'openai/gpt-oss-120b',
           messages:[{ role:'user', content:`You are a mental health AI coach for VitalOS. Analyze this week's mood data for an Indian user and give compassionate, specific, actionable advice in 3-4 sentences. Focus on patterns, not just scores. Be warm and human.\n\nData:\n${recentStr}` }],
           max_tokens:200, temperature:0.7
         })
@@ -342,3 +342,4 @@ export default function MentalHealthOS() {
     </div>
   )
 }
+

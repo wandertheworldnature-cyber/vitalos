@@ -1,5 +1,5 @@
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = 'llama-3.3-70b-versatile'
+const MODEL = 'openai/gpt-oss-120b'
 
 function getKey() {
   const k = import.meta.env.VITE_GROQ_API_KEY
@@ -115,3 +115,4 @@ export async function computeLongevityScore(records: Array<{
   const s = Math.min(95, Math.max(30, score))
   return { score: s, change: 2, breakdown: { metabolic: s-5, cardiovascular: s-8, sleep: s+5, activity: s, nutrition: s-3 } }
 }
+

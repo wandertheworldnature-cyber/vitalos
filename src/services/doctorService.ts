@@ -89,3 +89,4 @@ export async function cancelAppointment(appointmentId: string): Promise<void> {
     .eq('id', appointmentId)
   if (error) throw error
 }
+

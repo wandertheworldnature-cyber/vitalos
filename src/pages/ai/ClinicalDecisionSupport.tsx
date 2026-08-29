@@ -52,7 +52,7 @@ export default function ClinicalDecisionSupport() {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method:'POST', headers:{'Content-Type':'application/json', Authorization:`Bearer ${key}`},
         body: JSON.stringify({
-          model:'llama-3.3-70b-versatile',
+          model:'openai/gpt-oss-120b',
           messages:[{ role:'user', content:`You are a Clinical Decision Support AI for VitalOS. Generate a concise clinical summary for a doctor reviewing this patient.\n\nPatient: ${summary.name}, Age: ${summary.age}, Gender: ${summary.gender}\n\nLab Results:\n${dataStr}\n\nProvide JSON with:\n{"aiSummary":"2-3 sentence clinical summary","riskFlags":["risk 1","risk 2"],"trendAlerts":["alert 1"],"recommendedTests":["test 1","test 2"]}` }],
           max_tokens:500, temperature:0.3, response_format:{type:'json_object'}
         })
@@ -172,3 +172,4 @@ export default function ClinicalDecisionSupport() {
     </div>
   )
 }
+

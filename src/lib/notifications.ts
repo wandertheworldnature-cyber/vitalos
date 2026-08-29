@@ -73,3 +73,4 @@ export function getNotificationPermissionStatus(): NotificationPermission | 'uns
   if (!isNotificationSupported()) return 'unsupported'
   return Notification.permission
 }
+

@@ -93,7 +93,7 @@ export default function CorrelationEngine() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openai/gpt-oss-120b',
           messages: [{
             role: 'user',
             content: `You are an advanced biomarker correlation AI for VitalOS (Indian health platform). Analyze these health markers and find hidden correlations that a normal doctor might miss. Think like an integrative medicine specialist.\n\nData:\n${dataStr}\n\nFind 4-5 specific correlations between these markers. For each, explain:\n1. Which markers are correlated\n2. What this pattern means physiologically\n3. What the patient should do\n\nRespond as JSON: {"correlations": ["insight 1", "insight 2", ...]}`
@@ -123,7 +123,7 @@ export default function CorrelationEngine() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openai/gpt-oss-120b',
           messages: [{
             role: 'user',
             content: `Deep dive analysis for "${cluster.title}" pattern in an Indian patient.\n\nRelevant markers:\n${dataStr}\n\nProvide a detailed 4-5 sentence analysis covering:\n1. What this specific pattern means for this patient\n2. The physiological mechanism behind it\n3. Timeline if left untreated\n4. Step-by-step action plan with Indian context\n\nBe specific, use actual values, be actionable.`
@@ -268,3 +268,4 @@ export default function CorrelationEngine() {
     </div>
   )
 }
+

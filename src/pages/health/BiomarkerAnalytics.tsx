@@ -151,7 +151,7 @@ export default function BiomarkerAnalytics() {
         method:'POST',
         headers:{'Content-Type':'application/json', Authorization:`Bearer ${key}`},
         body: JSON.stringify({
-          model:'llama-3.3-70b-versatile',
+          model:'openai/gpt-oss-120b',
           messages:[{ role:'user', content:`You are a biomarker correlation AI for VitalOS (Indian health platform). Analyze these biomarkers and identify 3-4 key correlations/patterns. Be specific, mention actual values, explain the connection in simple English. Format as bullet points.\n\nBiomarkers:\n${markerStr}` }],
           max_tokens:400, temperature:0.4,
           response_format:{ type:'json_object' }
@@ -301,3 +301,4 @@ export default function BiomarkerAnalytics() {
     </div>
   )
 }
+

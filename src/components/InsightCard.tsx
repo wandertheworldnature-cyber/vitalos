@@ -82,3 +82,4 @@ export default function InsightCard({ insight, onAction }: Props) {
     </div>
   )
 }
+

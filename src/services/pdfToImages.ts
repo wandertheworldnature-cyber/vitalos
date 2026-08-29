@@ -36,3 +36,4 @@ export async function pdfToImages(file: File): Promise<string[]> {
   
   return images
 }
+

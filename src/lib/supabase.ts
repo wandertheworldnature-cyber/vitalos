@@ -11,3 +11,4 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     storageKey: 'vitalos-auth',  // unique storage key
   },
 })
+

@@ -155,3 +155,4 @@ export interface MetricCard {
   status: 'normal' | 'warning' | 'critical' | 'good'
   referenceRange?: string
 }
+

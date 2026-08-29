@@ -78,7 +78,7 @@ export default function DigitalTwinPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openai/gpt-oss-120b',
           messages: [{ role: 'user', content: `You are a precision health AI running a simulation for VitalOS "Digital Twin" feature.
 
 CURRENT PATIENT DATA:
@@ -311,3 +311,4 @@ Return ONLY valid JSON:
     </div>
   )
 }
+

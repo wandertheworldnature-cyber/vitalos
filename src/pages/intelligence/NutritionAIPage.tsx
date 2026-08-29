@@ -59,7 +59,7 @@ export default function NutritionAIPage() {
         method:'POST',
         headers:{'Content-Type':'application/json',Authorization:`Bearer ${key}`},
         body:JSON.stringify({
-          model:'llama-3.3-70b-versatile',
+          model:'openai/gpt-oss-120b',
           messages:[{
             role:'user',
             content:`You are a clinical nutritionist AI for VitalOS, an Indian health platform.
@@ -203,3 +203,4 @@ Return ONLY valid JSON:
     </div>
   )
 }
+

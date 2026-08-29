@@ -290,3 +290,4 @@ create policy "Admins view all profiles" on profiles
     </div>
   )
 }
+

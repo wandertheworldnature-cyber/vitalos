@@ -46,7 +46,7 @@ export default function AIHealthSearch() {
         method:'POST',
         headers:{'Content-Type':'application/json', Authorization:`Bearer ${key}`},
         body: JSON.stringify({
-          model:'llama-3.3-70b-versatile',
+          model:'openai/gpt-oss-120b',
           messages:[{ role:'user', content:`You are VitalOS AI Health Search. Patient health data: ${ctx||'No data yet'}. Question: "${searchQ}". Analyze their actual data and answer specifically. Format: 1) Direct answer 2) What their data shows 3) Likely causes 4) Next steps. Under 200 words. Indian context.` }],
           max_tokens:400, temperature:0.5,
         })
@@ -109,3 +109,4 @@ export default function AIHealthSearch() {
     </div>
   )
 }
+

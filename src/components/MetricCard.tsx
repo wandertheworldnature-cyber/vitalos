@@ -68,3 +68,4 @@ export default function MetricCard({ metric, onClick }: Props) {
     </div>
   )
 }
+

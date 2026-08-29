@@ -87,7 +87,7 @@ export default function HealthMemoryPage() {
         method:'POST',
         headers:{'Content-Type':'application/json',Authorization:`Bearer ${key}`},
         body:JSON.stringify({
-          model:'llama-3.3-70b-versatile',
+          model:'openai/gpt-oss-120b',
           messages:[{
             role:'user',
             content:`You are a health AI reviewing a patient's complete health history. Summarize the key patterns, risks, and health journey in 3-4 paragraphs. Be specific, mention dates and conditions. End with 2-3 personalized recommendations based on the history.\n\nHealth memory:\n${memStr||'No memories recorded yet'}`
@@ -296,3 +296,4 @@ export default function HealthMemoryPage() {
     </div>
   )
 }
+
